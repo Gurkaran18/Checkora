@@ -340,7 +340,6 @@ def ai_move(request):
     depth = depth_map.get(difficulty, 3)
 
     best = game.get_ai_move(depth=depth)
-    best = game.get_ai_move(depth=depth)
     
     if not best:
         if game.game_status == 'checkmate':
