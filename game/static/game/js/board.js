@@ -2067,19 +2067,38 @@
                 });
             });
 
-            // Show browser confirmation dialog if user tries to leave during an active game
-            // Skip beforeunload alert in Selenium tests to prevent UnexpectedAlertPresentException
+           // Custom leave confirmation modal instead of browser default dialog
             if (!navigator.webdriver) {
                 window.addEventListener('beforeunload', (e) => {
-                    if (!paused) {
-                        navigator.sendBeacon('/api/pause/', JSON.stringify({ pause: true }));
-                    }
-                    if (!gameOver && !welcomeOverlay.classList.contains('active')) {
-                        e.preventDefault();
-                        e.returnValue = '';
-                    }
+               if (!paused) {
+                    const blob = new Blob([JSON.stringify({ pause: true })], { type: 'application/json' });
+                    navigator.sendBeacon('/api/pause/', blob);
+                   }
                 });
             }
+
+// Leave Game confirmation modal logic
+const leaveConfirmOverlay = document.getElementById('leaveConfirmOverlay');
+const leaveConfirmYes = document.getElementById('leaveConfirmYes');
+const leaveConfirmNo = document.getElementById('leaveConfirmNo');
+
+document.querySelectorAll('a[href="/"]').forEach(link => {
+    link.addEventListener('click', (e) => {
+        if (!gameOver && !welcomeOverlay.classList.contains('active')) {
+            e.preventDefault();
+            leaveConfirmOverlay.style.display = 'flex';
+        }
+    });
+});
+
+if (leaveConfirmYes) leaveConfirmYes.addEventListener('click', () => {
+    window.location.href = '/';
+});
+
+if (leaveConfirmNo) leaveConfirmNo.addEventListener('click', () => {
+    leaveConfirmOverlay.style.display = 'none';
+});
+            
             function showAssetWarning() {
                 const t = document.getElementById('confirmTimerContainer');
                 const d = document.getElementById('confirmDifficultyContainer');
