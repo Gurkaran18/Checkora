@@ -4,10 +4,7 @@ from django.contrib.auth import views as auth_views
 from game.views import CustomPasswordResetView
 from django.views.generic import TemplateView
 from django.shortcuts import render
-from game.forms import (
-    CustomPasswordResetForm,
-    CustomSetPasswordForm
-)
+from game.forms import CustomSetPasswordForm
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -37,7 +34,7 @@ urlpatterns = [
              form_class=CustomSetPasswordForm
          ),
          name='password_reset_confirm'),
-
+    
     path('password-reset-complete/',
          auth_views.PasswordResetCompleteView.as_view(
              template_name='game/password_reset_complete.html'
