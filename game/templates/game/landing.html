@@ -102,7 +102,17 @@
         </div>
       </div>
       <div class="nav-right">
-        <button id="theme-toggle" class="theme-toggle">🌙</button>
+        <button
+id="theme-toggle"
+class="theme-toggle"
+type="button"
+aria-label="Toggle theme"
+aria-pressed="false"
+
+>
+
+🌙 </button>
+
 
         {% if user.is_authenticated %}
         <a href="{% url 'index' %}" class="btn-signin">Dashboard</a>
@@ -453,13 +463,19 @@
     }
 
     // Update icon
-    function updateIcon() {
-        if (root.getAttribute("data-theme") === "light") {
-            themeToggle.textContent = "☀️";
-        } else {
-            themeToggle.textContent = "🌙";
-        }
+// Update icon
+function updateIcon() {
+    const isLight = root.getAttribute("data-theme") === "light";
+
+    if (isLight) {
+        themeToggle.textContent = "☀️";
+    } else {
+        themeToggle.textContent = "🌙";
     }
+
+    themeToggle.setAttribute("aria-pressed", isLight);
+}
+
 
     updateIcon();
 
