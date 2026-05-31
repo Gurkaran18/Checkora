@@ -30,8 +30,10 @@ SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-dev-key-for-local-tes
 
 # SECURITY WARNING: don't run with debug turned on in production!
 IS_PRODUCTION = bool(os.environ.get('VERCEL'))
-_default_debug = 'False' if IS_PRODUCTION else 'True'
-DEBUG = os.environ.get('DEBUG', _default_debug).lower() == 'true'
+if IS_PRODUCTION:
+    DEBUG = False
+else:
+    DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
 ALLOWED_HOSTS = ['.vercel.app', '*']
 

@@ -14,7 +14,7 @@ class Command(RunserverCommand):
         if self._raw_ipv6:
             host = f'[{self.addr}]'
         elif self.addr == '0':
-            host = '0.0.0.0'
+            host = '127.0.0.1'
         else:
             host = self.addr
 

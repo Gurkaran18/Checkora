@@ -578,6 +578,7 @@ If you already have another service running on your local port 8000, Django will
     ```
 
 ### 🔒 7. Local SSL Error (`ERR_SSL_PROTOCOL_ERROR`)
+
 If the browser shows `ERR_SSL_PROTOCOL_ERROR` or the terminal prints *"You're accessing the development server over HTTPS, but it only supports HTTP"*, the browser is using HTTPS against the local HTTP dev server.
 
 *   **Resolution:**
