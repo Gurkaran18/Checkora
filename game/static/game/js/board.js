@@ -1770,6 +1770,7 @@
                     `;
                     movesEl.appendChild(row);
                 }
+                movesEl.scrollTop = 0;
             }
 
             function updateCaptured(cap) {
