@@ -58,6 +58,11 @@
             let dailyPuzzleMode = false;
             let currentPuzzle = null;
             let puzzleMoveIndex = 0;
+            let currentPuzzleFen = null;
+            let puzzleAnalyzing = false;
+            let stockfishWorker = null;
+            let expectedMoveEval = null;
+            let evaluationCache = {};
             let currentDifficulty = 'medium';
             let currentWhiteName = 'White';
             let currentBlackName = 'Black';
@@ -231,6 +236,116 @@
 
                 return PUZZLES[dayIndex];
             }
+
+            function initStockfish() {
+                if (!stockfishWorker) {
+                    stockfishWorker = new Worker('/static/game/js/stockfish.js');
+                    stockfishWorker.postMessage('setoption name Hash value 16');
+                    stockfishWorker.postMessage('setoption name Contempt value 0');
+                }
+            }
+
+            function getStockfishEval(fen) {
+                if (evaluationCache[fen]) {
+                    return Promise.resolve(evaluationCache[fen]);
+                }
+                return new Promise((resolve) => {
+                    initStockfish();
+                    
+                    let scoreType = 'cp';
+                    let scoreValue = 0;
+                    
+                    const onMessage = (e) => {
+                        const line = e.data;
+                        const match = line.match(/score (cp|mate) (-?\d+)/);
+                        if (match) {
+                            scoreType = match[1];
+                            scoreValue = parseInt(match[2], 10);
+                        }
+                        
+                        if (line.startsWith('bestmove')) {
+                            stockfishWorker.removeEventListener('message', onMessage);
+                            const result = { type: scoreType, value: scoreValue };
+                            evaluationCache[fen] = result;
+                            resolve(result);
+                        }
+                    };
+                    
+                    stockfishWorker.addEventListener('message', onMessage);
+                    stockfishWorker.postMessage('ucinewgame');
+                    stockfishWorker.postMessage(`position fen ${fen}`);
+                    stockfishWorker.postMessage('go depth 6 movetime 100');
+                });
+            }
+
+            function getPlayerScore(evalResult) {
+                const type = evalResult.type;
+                const value = evalResult.value;
+                if (type === 'mate') {
+                    if (value > 0) {
+                        return -10000 + value;
+                    } else {
+                        return 10000 + value;
+                    }
+                } else {
+                    return -value || 0;
+                }
+            }
+
+            async function precalculateExpectedMoveEval() {
+                if (!currentPuzzle) return;
+                const expectedMove = currentPuzzle.solution[puzzleMoveIndex];
+                if (!expectedMove) return;
+                try {
+                    if (!window.Chess) return;
+                    const chess = new window.Chess(currentPuzzleFen);
+                    const from = expectedMove.substring(0, 2);
+                    const to = expectedMove.substring(2, 4);
+                    const promo = expectedMove.length > 4 ? expectedMove.charAt(4) : undefined;
+                    chess.move({ from, to, promotion: promo });
+                    const expectedFen = chess.fen();
+                    expectedMoveEval = await getStockfishEval(expectedFen);
+                } catch (e) {
+                    console.error("Error precalculating expected move eval:", e);
+                }
+            }
+
+            async function validateMoveWithStockfish(previousFen, playedFen, expectedMove) {
+                try {
+                    let expectedEval = expectedMoveEval;
+                    if (!expectedEval) {
+                        if (!window.Chess) {
+                            console.error("Chess.js not loaded");
+                            return false;
+                        }
+                        const chess = new window.Chess(previousFen);
+                        const from = expectedMove.substring(0, 2);
+                        const to = expectedMove.substring(2, 4);
+                        const promo = expectedMove.length > 4 ? expectedMove.charAt(4) : undefined;
+                        chess.move({ from, to, promotion: promo });
+                        const expectedFen = chess.fen();
+                        expectedEval = await getStockfishEval(expectedFen);
+                    }
+
+                    const playedEval = await getStockfishEval(playedFen);
+
+                    const valExpected = getPlayerScore(expectedEval);
+                    const valPlayed = getPlayerScore(playedEval);
+
+                    const isCorrect = (valPlayed >= 9000) || 
+                                      (valPlayed >= valExpected - 50) || 
+                                      (valPlayed >= 300 && valExpected >= 300);
+
+                    return isCorrect;
+                } catch (e) {
+                    console.error("Stockfish validation error:", e);
+                    return false;
+                }
+            }
+
+            function clearEvaluationCache() {
+                evaluationCache = {};
+            }
     
             async function startDailyPuzzle() {
                 currentPuzzle = getCurrentWeeklyPuzzle();
@@ -250,8 +365,15 @@
                     "pvp",
                     "white",
                     "medium",
-                    currentPuzzle.fen
+                    currentPuzzle.fen,
+                    null,
+                    null,
+                    true
                 );
+                currentPuzzleFen = currentPuzzle.fen;
+                expectedMoveEval = null;
+                initStockfish();
+                precalculateExpectedMoveEval();
                 const today = new Date().toLocaleDateString();
                 const streakData = getPuzzleStreak();
                 updateStreakDisplay();
@@ -1327,7 +1449,7 @@
                             turn = data.current_turn;
 
                             // Daily Puzzle Validation
-                            if (dailyPuzzleMode && currentPuzzle ) {
+                            if (dailyPuzzleMode && currentPuzzle && !puzzleAnalyzing) {
 
                                 const playedMove =
                                     `${String.fromCharCode(97 + fc)}${8 - fr}` +
@@ -1339,6 +1461,9 @@
                                 if (playedMove === expectedMove) {
 
                                     puzzleMoveIndex++;
+                                    currentPuzzleFen = data.fen;
+                                    expectedMoveEval = null;
+                                    precalculateExpectedMoveEval();
 
                                     if (puzzleMoveIndex >= currentPuzzle.solution.length) {
                                         
@@ -1358,14 +1483,61 @@
                                         return;
                                     }
                                 } else {
-                                    showConfirm(
-                                        "❌ Incorrect Move!",
-                                        "Would you like to try again?",
-                                        () => {
-                                            startDailyPuzzle();
-                                        },
-                                        "#ff4d4d"
-                                    );
+                                    // Start Stockfish validation for alternative moves
+                                    puzzleAnalyzing = true;
+                                    const origStatus = document.getElementById("game-status") ? document.getElementById("game-status").textContent : "";
+                                    showStatus("Analyzing move with Stockfish...", false);
+
+                                    validateMoveWithStockfish(currentPuzzleFen, data.fen, expectedMove)
+                                        .then((isCorrect) => {
+                                            puzzleAnalyzing = false;
+                                            showStatus(origStatus, false);
+
+                                            if (isCorrect) {
+                                                puzzleMoveIndex++;
+                                                currentPuzzleFen = data.fen;
+                                                expectedMoveEval = null;
+                                                precalculateExpectedMoveEval();
+
+                                                if (puzzleMoveIndex >= currentPuzzle.solution.length) {
+                                                    const streak = updatePuzzleStreak();
+                                                    updateStreakDisplay();
+                                                    showConfirm(
+                                                        "🎉 Puzzle Solved!",
+                                                        `🔥 Current Streak: ${streak}<br> 
+                                                        🏆 Best Streak: ${getPuzzleStreak().longestStreak}<br>
+                                                        Come back tomorrow for a new challenge.`,
+                                                        () => {
+                                                            gameLayout.style.visibility = "hidden";
+                                                            welcomeOverlay.classList.add("active");
+                                                        },
+                                                        "#f0c040"
+                                                    );
+                                                }
+                                            } else {
+                                                showConfirm(
+                                                    "❌ Incorrect Move!",
+                                                    "Would you like to try again?",
+                                                    () => {
+                                                        startDailyPuzzle();
+                                                    },
+                                                    "#ff4d4d"
+                                                );
+                                            }
+                                        })
+                                        .catch((err) => {
+                                            console.error("Stockfish validation promise error:", err);
+                                            puzzleAnalyzing = false;
+                                            showStatus(origStatus, false);
+                                            showConfirm(
+                                                "❌ Incorrect Move!",
+                                                "Would you like to try again?",
+                                                () => {
+                                                    startDailyPuzzle();
+                                                },
+                                                "#ff4d4d"
+                                            );
+                                        });
                                     return;
                                 }
                             }
@@ -2608,7 +2780,18 @@
                 );
             }
     
-            async function startNewGame(mode, pColor = 'white', difficulty = 'medium', fen = null, timeLimitMins = null, overrideNames = null) {
+            async function startNewGame(mode, pColor = 'white', difficulty = 'medium', fen = null, timeLimitMins = null, overrideNames = null, isPuzzle = false) {
+                evaluationCache = {};
+                if (!isPuzzle) {
+                    dailyPuzzleMode = false;
+                    currentPuzzle = null;
+                    currentPuzzleFen = null;
+                    puzzleAnalyzing = false;
+                    if (stockfishWorker) {
+                        stockfishWorker.terminate();
+                        stockfishWorker = null;
+                    }
+                }
                 replayMode = false;
                 // Show clocks for normal games
                 document.getElementById("whiteClock").style.display = "";
@@ -3717,7 +3900,7 @@ if (leaveConfirmNo) leaveConfirmNo.addEventListener('click', closeLeaveConfirm);
                 }
             });
             if (typeof module !== "undefined" && module.exports) {
-                module.exports = { pColor, getSquareLabel, formatTime };
+                module.exports = { pColor, getSquareLabel, formatTime, getPlayerScore, validateMoveWithStockfish, clearEvaluationCache };
             } else {
                 loadGame();
             }
