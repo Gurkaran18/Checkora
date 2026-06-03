@@ -199,7 +199,9 @@ body {
 .profile-dropdown:hover .dropdown-content {
     display: block;
 }
-
+.profile-dropdown:focus-within .dropdown-content {
+    display: block;
+}
 .dropdown-content a,
 .logout-option {
     display: block;
@@ -220,14 +222,13 @@ body {
     background: rgba(255, 255, 255, 0.06);
 }
 
-.delete-option {
-    color: #ef4444 !important;
+.dropdown-content .delete-option {
+    color: #ef4444;
 }
 
-.delete-option:hover {
-    background: rgba(239, 68, 68, 0.12) !important;
+.dropdown-content .delete-option:hover {
+    background: rgba(239, 68, 68, 0.12);
 }
-
 .back-btn {
     position: absolute;
     top: 2rem;
@@ -939,7 +940,7 @@ body {
 .faq-subtitle {
     text-align: center;
     color: #a0a5b5;
-    font-family: 'Inter', sans-serif;
+    font-family: Inter, sans-serif;
     font-size: 1rem;
     margin-top: -20px;
     margin-bottom: 48px;
@@ -980,7 +981,7 @@ body {
     outline: none;
     cursor: pointer;
     text-align: left;
-    font-family: 'Inter', sans-serif;
+    font-family: Inter, sans-serif;
     font-size: 1.1rem;
     font-weight: 600;
     color: #ffffff;
@@ -1023,7 +1024,7 @@ body {
 
 .faq-answer-content {
     padding: 0 24px 24px 24px;
-    font-family: 'Inter', sans-serif;
+    font-family: Inter, sans-serif;
     font-size: 0.95rem;
     line-height: 1.6;
     color: #c4c8d5;
