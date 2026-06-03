@@ -1588,8 +1588,12 @@ class SecureRegistrationTest(TestCase):
             data=self.VALID_PAYLOAD,
         )
         self.assertEqual(response.status_code, 302)
-        # The old account should still exist — not deleted and recreated
-        self.assertTrue(User.objects.filter(id=old_id).exists())
+        self.assertEqual(response.url, '/verify-otp/')
+        reused = User.objects.get(id=old_id)
+        self.assertEqual(reused.username, 'newchessplayer')
+        self.assertEqual(reused.email, 'newchessplayer@example.com')
+        self.assertTrue(reused.check_password('StrongPass123!'))
+        self.assertEqual(User.objects.filter(id=old_id).count(), 1)
 
     # --- 5. Inactive username conflict — preserved, not deleted ---------------
 
@@ -1607,10 +1611,10 @@ class SecureRegistrationTest(TestCase):
             is_active=False,
         )
         self.client.post('/register/', data=self.VALID_PAYLOAD)
-        # Account must still exist
-        self.assertTrue(
-            User.objects.filter(id=inactive.id).exists()
-        )
+        self.assertEqual(User.objects.filter(username='newchessplayer').count(), 1)
+        self.assertTrue(User.objects.filter(id=inactive.id).exists())
+        inactive.refresh_from_db()
+        self.assertEqual(inactive.email, 'newchessplayer@example.com')
 
     # --- 6. Concurrent registration — IntegrityError handled ------------------
 
@@ -1661,6 +1665,8 @@ class SecureRegistrationTest(TestCase):
             data=self.VALID_PAYLOAD,
         )
         self.assertEqual(resp_existing.status_code, resp_new.status_code)
+        self.assertEqual(resp_existing.url, resp_new.url)
+        self.assertEqual(resp_existing.url, '/verify-otp/')
 
     # --- 8. OTP expiry preserves inactive user --------------------------------
 
@@ -1689,6 +1695,7 @@ class SecureRegistrationTest(TestCase):
 
     # --- 9. Active email conflict dummy session verify ------------------------
 
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
     def test_active_email_conflict_sets_up_dummy_session_and_renders_verify_otp(self):
         """Registering with an active email must set up dummy session data.
 
@@ -1705,6 +1712,8 @@ class SecureRegistrationTest(TestCase):
         # Should redirect to verify-otp and load with 200 OK
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Enter 6-Digit OTP')
+        # Critical: no email should be sent in the dummy session path
+        self.assertEqual(len(mail.outbox), 0)
         # Check that session contains dummy credentials and email is masked in the response
         self.assertEqual(self.client.session.get('registration_user_id'), -1)
         self.assertEqual(self.client.session.get('registration_email'), 'taken@example.com')
@@ -1720,6 +1729,11 @@ class SecureRegistrationTest(TestCase):
         self.assertEqual(resend_response.status_code, 200)
         self.assertContains(resend_response, 'A new OTP has been sent to your email.')
         self.assertIsNotNone(self.client.session.get('last_otp_time'))
+
+        # Second immediate resend should be rate-limited
+        resend_response2 = self.client.post('/resend-otp/', follow=True)
+        self.assertEqual(resend_response2.status_code, 200)
+        self.assertContains(resend_response2, 'Please wait')
 
 
 class InsufficientMaterialDrawTest(TestCase):

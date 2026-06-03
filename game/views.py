@@ -593,57 +593,42 @@ def register_view(request):
             username = form.cleaned_data['username']
             email = form.cleaned_data['email']
 
-            # Security: detect conflicts with existing accounts inside
-            # an atomic block to eliminate race conditions between the
-            # check and the subsequent insert.
-            with transaction.atomic():
-                active_conflict = User.objects.filter(
-                    Q(username__iexact=username) | Q(email__iexact=email),
-                    is_active=True,
-                ).select_for_update().exists()
+            # Concurrency: serialize registration requests for the same email
+            # using a lightweight, synchronized cache lock.
+            email_lock_key = f"reg_lock_email_{hashlib.sha256(email.lower().strip().encode()).hexdigest()}"
+            lock_acquired = cache.add(email_lock_key, "locked", timeout=10)
+            if not lock_acquired:
+                # Concurrent request in progress — return the same generic redirect.
+                request.session['registration_user_id'] = -1
+                request.session['registration_email'] = email
+                dummy_otp = str(secrets.randbelow(900000) + 100000)
+                dummy_otp_hash = hashlib.sha256(
+                    f"{dummy_otp}:{settings.SECRET_KEY}".encode()
+                ).hexdigest()
+                request.session['registration_otp_hash'] = dummy_otp_hash
+                request.session['otp_created_at'] = time.time()
+                messages.success(
+                    request,
+                    'If your details are valid, a verification '
+                    'code has been sent to your email.',
+                )
+                return redirect('verify_otp')
 
-                if active_conflict:
-                    # Return the same generic response as a successful
-                    # registration so attackers cannot distinguish
-                    # between "email/username exists" and "new account".
-                    request.session['registration_user_id'] = -1
-                    request.session['registration_email'] = email
-                    dummy_otp = str(secrets.randbelow(900000) + 100000)
-                    dummy_otp_hash = hashlib.sha256(
-                        f"{dummy_otp}:{settings.SECRET_KEY}".encode()
-                    ).hexdigest()
-                    request.session['registration_otp_hash'] = dummy_otp_hash
-                    request.session['otp_created_at'] = time.time()
-                    messages.success(
-                        request,
-                        'If your details are valid, a verification '
-                        'code has been sent to your email.',
-                    )
-                    return redirect('verify_otp')
+            is_new_user = False
+            try:
+                # Security: detect conflicts with existing accounts inside
+                # an atomic block to eliminate race conditions between the
+                # check and the subsequent insert.
+                with transaction.atomic():
+                    active_conflict = User.objects.filter(
+                        Q(username__iexact=username) | Q(email__iexact=email),
+                        is_active=True,
+                    ).select_for_update().exists()
 
-                # Re-verification: if an inactive account already owns
-                # this username or email, reuse it instead of creating
-                # a duplicate.  This preserves the original account.
-                inactive_user = User.objects.filter(
-                    Q(username__iexact=username) | Q(email__iexact=email),
-                    is_active=False,
-                ).select_for_update().first()
-
-                if inactive_user:
-                    user = inactive_user
-                    # Update password to the one the user just supplied
-                    user.set_password(form.cleaned_data['password1'])
-                    user.username = username
-                    user.email = email
-                    user.save()
-                else:
-                    try:
-                        user = form.save(commit=False)
-                        user.is_active = False
-                        user.save()
-                    except IntegrityError:
-                        # Concurrent insert beat us despite the atomic
-                        # block — return the same generic message.
+                    if active_conflict:
+                        # Return the same generic response as a successful
+                        # registration so attackers cannot distinguish
+                        # between "email/username exists" and "new account".
                         request.session['registration_user_id'] = -1
                         request.session['registration_email'] = email
                         dummy_otp = str(secrets.randbelow(900000) + 100000)
@@ -659,84 +644,141 @@ def register_view(request):
                         )
                         return redirect('verify_otp')
 
-            # Generate 6-digit OTP
-            otp = str(secrets.randbelow(900000) + 100000)
-            request.session['registration_user_id'] = user.id
-            # Hash OTP with SECRET_KEY as salt to prevent reading from signed cookies
-            otp_hash = hashlib.sha256(
-                f"{otp}:{settings.SECRET_KEY}".encode()
-            ).hexdigest()
-            request.session['registration_otp_hash'] = otp_hash
-            request.session['otp_created_at'] = time.time()
+                    # Re-verification: if an inactive account already owns
+                    # this username or email, reuse it instead of creating
+                    # a duplicate.  This preserves the original account.
+                    inactive_user = User.objects.filter(
+                        Q(username__iexact=username) | Q(email__iexact=email),
+                        is_active=False,
+                    ).select_for_update().first()
 
-            missing_email_credentials = (
-                not settings.EMAIL_HOST_USER or
-                not settings.EMAIL_HOST_PASSWORD
-            )
+                    if inactive_user:
+                        user = inactive_user
+                        # Update password to the one the user just supplied
+                        user.set_password(form.cleaned_data['password1'])
+                        user.username = username
+                        user.email = email
+                        user.full_clean(validate_unique=False)
+                        user.save()
+                    else:
+                        try:
+                            user = form.save(commit=False)
+                            user.is_active = False
+                            user.full_clean(validate_unique=False)
+                            user.save()
+                            is_new_user = True
+                        except IntegrityError:
+                            # Concurrent insert beat us despite the atomic
+                            # block — return the same generic message.
+                            request.session['registration_user_id'] = -1
+                            request.session['registration_email'] = email
+                            dummy_otp = str(secrets.randbelow(900000) + 100000)
+                            dummy_otp_hash = hashlib.sha256(
+                                f"{dummy_otp}:{settings.SECRET_KEY}".encode()
+                            ).hexdigest()
+                            request.session['registration_otp_hash'] = dummy_otp_hash
+                            request.session['otp_created_at'] = time.time()
+                            messages.success(
+                                request,
+                                'If your details are valid, a verification '
+                                'code has been sent to your email.',
+                            )
+                            return redirect('verify_otp')
 
-            if settings.DEBUG and missing_email_credentials:
-                print(
-                    f"[Checkora] Development registration OTP "
-                    f"for {user.email}: {otp}"
-                )
-                return redirect('verify_otp')
+                # Generate 6-digit OTP
+                otp = str(secrets.randbelow(900000) + 100000)
+                request.session['registration_user_id'] = user.id
+                # Hash OTP with SECRET_KEY as salt to prevent reading from signed cookies
+                otp_hash = hashlib.sha256(
+                    f"{otp}:{settings.SECRET_KEY}".encode()
+                ).hexdigest()
+                request.session['registration_otp_hash'] = otp_hash
+                request.session['otp_created_at'] = time.time()
 
-            # Send Email
-            try:
-                msg_plain = (
-                    f'Your OTP for registration is: {otp}\n\n'
-                    'Please enter this code to activate your account.'
+                missing_email_credentials = (
+                    not settings.EMAIL_HOST_USER or
+                    not settings.EMAIL_HOST_PASSWORD
                 )
-                html_message = (
-                    "<div style=\"font-family: 'Segoe UI', Arial, "
-                    "sans-serif; background-color: #0f0f1a; color: "
-                    "#d0d0d0; padding: 40px 20px; text-align: center;"
-                    "\"><div style=\"background-color: #16162a; border"
-                    ": 1px solid #252545; border-radius: 12px; padding"
-                    ": 40px 30px; max-width: 450px; margin: 0 auto; "
-                    "box-shadow: 0 10px 30px rgba(0,0,0,0.5);\">"
-                    "<h1 style=\"color: #ffffff; margin-top: 0; "
-                    "margin-bottom: 15px; font-size: 28px; "
-                    "letter-spacing: 2px;\">CHECK<span style=\"color: "
-                    "#f0c040;\">ORA</span></h1><hr style=\"border: "
-                    "none; border-top: 1px solid #252545; margin: "
-                    "20px 0;\"><p style=\"color: #e0e0e0; font-size: "
-                    "16px; line-height: 1.5; margin-bottom: 30px;\">"
-                    "Welcome to the elite chess platform. To activate "
-                    "your account and start playing, please use the "
-                    "verification code below:</p><div style=\"margin: "
-                    "35px 0;\"><span style=\"font-family: 'Consolas', "
-                    "monospace; font-size: 36px; font-weight: bold; "
-                    "color: #f0c040; letter-spacing: 8px; background: "
-                    "#0f0f1a; padding: 15px 25px; border-radius: 8px; "
-                    "border: 1px solid #3d3222; display: inline-block;"
-                    "\">{otp}</span></div><p style=\"color: #8a8aaa; "
-                    "font-size: 14px; margin-top: 30px;\">Enter this "
-                    "code on the verification page to complete your "
-                    "registration.</p><p style=\"color: #5a5a7a; "
-                    "font-size: 12px; margin-top: 40px;\">If you "
-                    "didn't attempt to register on Checkora, please "
-                    "safely ignore this email.</p></div></div>"
-                ).format(otp=otp)
-                send_mail(
-                    'Your Checkora Verification Code',
-                    msg_plain,
-                    None,  # Will use EMAIL_HOST_USER
-                    [user.email],
-                    fail_silently=False,
-                    html_message=html_message
-                )
-                return redirect('verify_otp')
-            except (SMTPException, BadHeaderError, OSError):
-                # If email fails, delete the user so they can try again
-                user.delete()
-                request.session.pop('registration_user_id', None)
-                request.session.pop('registration_otp_hash', None)
-                err_msg = (
-                    'Failed to send OTP email. '
-                    'Please check your email address and try again.'
-                )
-                messages.error(request, err_msg)
+
+                if settings.DEBUG and missing_email_credentials:
+                    print(
+                        f"[Checkora] Development registration OTP "
+                        f"for {user.email}: {otp}"
+                    )
+                    messages.success(
+                        request,
+                        'If your details are valid, a verification '
+                        'code has been sent to your email.',
+                    )
+                    return redirect('verify_otp')
+
+                # Send Email
+                try:
+                    msg_plain = (
+                        f'Your OTP for registration is: {otp}\n\n'
+                        'Please enter this code to activate your account.'
+                    )
+                    html_message = (
+                        "<div style=\"font-family: 'Segoe UI', Arial, "
+                        "sans-serif; background-color: #0f0f1a; color: "
+                        "#d0d0d0; padding: 40px 20px; text-align: center;"
+                        "\"><div style=\"background-color: #16162a; border"
+                        ": 1px solid #252545; border-radius: 12px; padding"
+                        ": 40px 30px; max-width: 450px; margin: 0 auto; "
+                        "box-shadow: 0 10px 30px rgba(0,0,0,0.5);\">"
+                        "<h1 style=\"color: #ffffff; margin-top: 0; "
+                        "margin-bottom: 15px; font-size: 28px; "
+                        "letter-spacing: 2px;\">CHECK<span style=\"color: "
+                        "#f0c040;\">ORA</span></h1><hr style=\"border: "
+                        "none; border-top: 1px solid #252545; margin: "
+                        "20px 0;\"><p style=\"color: #e0e0e0; font-size: "
+                        "16px; line-height: 1.5; margin-bottom: 30px;\">"
+                        "Welcome to the elite chess platform. To activate "
+                        "your account and start playing, please use the "
+                        "verification code below:</p><div style=\"margin: "
+                        "35px 0;\"><span style=\"font-family: 'Consolas', "
+                        "monospace; font-size: 36px; font-weight: bold; "
+                        "color: #f0c040; letter-spacing: 8px; background: "
+                        "#0f0f1a; padding: 15px 25px; border-radius: 8px; "
+                        "border: 1px solid #3d3222; display: inline-block;"
+                        "\">{otp}</span></div><p style=\"color: #8a8aaa; "
+                        "font-size: 14px; margin-top: 30px;\">Enter this "
+                        "code on the verification page to complete your "
+                        "registration.</p><p style=\"color: #5a5a7a; "
+                        "font-size: 12px; margin-top: 40px;\">If you "
+                        "didn't attempt to register on Checkora, please "
+                        "safely ignore this email.</p></div></div>"
+                    ).format(otp=otp)
+                    send_mail(
+                        'Your Checkora Verification Code',
+                        msg_plain,
+                        None,  # Will use EMAIL_HOST_USER
+                        [user.email],
+                        fail_silently=False,
+                        html_message=html_message
+                    )
+                    messages.success(
+                        request,
+                        'If your details are valid, a verification '
+                        'code has been sent to your email.',
+                    )
+                    return redirect('verify_otp')
+                except (SMTPException, BadHeaderError, OSError):
+                    # If email fails, delete the user only if it was newly created.
+                    # This preserves existing inactive accounts for re-verification.
+                    if is_new_user:
+                        user.delete()
+                    request.session.pop('registration_user_id', None)
+                    request.session.pop('registration_otp_hash', None)
+                    request.session.pop('registration_email', None)
+                    request.session.pop('otp_created_at', None)
+                    err_msg = (
+                        'Failed to send OTP email. '
+                        'Please check your email address and try again.'
+                    )
+                    messages.error(request, err_msg)
+            finally:
+                cache.delete(email_lock_key)
     else:
         form = CustomUserCreationForm()
 
@@ -795,6 +837,7 @@ def verify_otp(request):
                 request.session.pop('registration_email', None)
 
                 try:
+                    from django.template import TemplateDoesNotExist, TemplateSyntaxError
                     html_content = render_to_string(
                         'game/welcome_email.html',
                         {
@@ -811,8 +854,8 @@ def verify_otp(request):
                     email.attach_alternative(html_content, "text/html")
                     email.send(fail_silently=True)
 
-                except Exception as e:
-                    logger.warning("Failed to send welcome email: %s", e)
+                except (TemplateDoesNotExist, TemplateSyntaxError):
+                    logger.exception("Failed to render welcome email template.")
 
                 login(request, user)
                 messages.success(
@@ -891,6 +934,7 @@ def resend_otp(request):
             f"{otp}:{settings.SECRET_KEY}".encode()
         ).hexdigest()
         request.session['registration_otp_hash'] = otp_hash
+        request.session['otp_created_at'] = time.time()
         request.session['last_otp_time'] = time.time()
         messages.success(request, 'A new OTP has been sent to your email.')
         return redirect('verify_otp')
@@ -927,6 +971,7 @@ def resend_otp(request):
             request,
             'A new OTP has been sent to your email.'
         )
+        request.session['otp_created_at'] = time.time()
         request.session['last_otp_time'] = time.time()
 
     except (SMTPException, BadHeaderError, OSError):
