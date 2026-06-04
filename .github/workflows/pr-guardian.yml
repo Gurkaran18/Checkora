@@ -20,7 +20,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.base.ref }}
-          sparse-checkout: .github/scripts
+          fetch-depth: 1
+          path: base-tree
 
       - name: Check assignee vs PR author
         id: check
@@ -28,7 +29,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
-        run: python .github/scripts/pr_assignee_check.py ci
+        run: python3 base-tree/.github/scripts/pr_assignee_check.py ci
 
       - name: Ensure labels exist
         uses: actions/github-script@v7
@@ -93,6 +94,11 @@ jobs:
               reasonTitle = 'PR template not filled in';
               reasonQuote =
                 'The description still contains the placeholder **`Fixes #(issue number)`**. Replace it with a real issue number, e.g. **`Fixes #123`**.';
+              steps = [
+                'Edit the PR description and replace **`Fixes #(issue number)`** with a real issue, e.g. **`Fixes #123`**.',
+                'Get **assigned** to that issue on GitHub.',
+                'Save the description (or push a commit) so PR Guardian can re-check.',
+              ];
             } else if (reason === 'no_issue_linked') {
               reasonTitle = 'No linked issue';
               reasonQuote =
@@ -123,7 +129,7 @@ jobs:
               ];
             }
 
-            const stepsBlock = steps
+            const stepsBlock = (steps || [])
               .map((step, i) => `${i + 1}. ${step}`)
               .join('\n');
 
