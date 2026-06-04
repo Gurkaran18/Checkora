@@ -12,6 +12,7 @@ from django.core import mail
 from django.core.cache import cache
 from django.urls import reverse
 from django.test import (
+    Client,
     RequestFactory,
     SimpleTestCase,
     TestCase,
@@ -2048,16 +2049,22 @@ class AdditionalViewsSecurityAndLessonsTest(TestCase):
         response = self.client.get(reverse('resend_otp'))
         self.assertEqual(response.status_code, 405)
 
-        # Setup session for active registration to test POST
-        session = self.client.session
+        csrf_client = Client(enforce_csrf_checks=True)
+        session = csrf_client.session
         session['registration_user_id'] = -1
         session['registration_email'] = 'test@example.com'
         session.save()
 
-        # POST should work
-        response = self.client.post(reverse('resend_otp'))
-        self.assertEqual(response.status_code, 302)
-        self.assertRedirects(response, reverse('verify_otp'))
+        # Missing CSRF token should fail
+        denied = csrf_client.post(reverse('resend_otp'))
+        self.assertEqual(denied.status_code, 403)
+
+        # With CSRF token should pass
+        csrf_client.get(reverse('index'))
+        token = csrf_client.cookies.get('csrftoken').value
+        allowed = csrf_client.post(reverse('resend_otp'), HTTP_X_CSRFTOKEN=token)
+        self.assertEqual(allowed.status_code, 302)
+        self.assertRedirects(allowed, reverse('verify_otp'))
 
     def test_resend_otp_deferred_session_writes(self):
         user = User.objects.create_user(
