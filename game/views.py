@@ -89,7 +89,7 @@ def record_game_result(request, mode, winner, reason, player_color='white', move
             moves = game_data.get('move_history', [])
         else:
             moves = []
-    GameResult.objects.create(
+    result = GameResult.objects.create(
         user=user,
         mode=mode,
         winner=winner,
@@ -97,6 +97,9 @@ def record_game_result(request, mode, winner, reason, player_color='white', move
         player_color=player_color,
         moves=moves
     )
+    
+    result.full_clean()
+    result.save()
     
     if user:
         check_game_achievements(user)
@@ -2280,11 +2283,13 @@ def complete_lesson(request, lesson_name):
 def achievements_view(request):
     achievements = Achievement.objects.all()
     
-    unlocked = UserAchievement.objects.filter(
-        user=request.user
-    ).values_list(
-        "achievement_id",
-        flat=True
+    unlocked = set(
+        UserAchievement.objects.filter(
+            user=request.user
+        ).values_list(
+            "achievement_id",
+            flat=True
+        )
     )
 
     return render(

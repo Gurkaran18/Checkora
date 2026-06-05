@@ -122,7 +122,8 @@ def check_game_achievements(user):
 
     checkmates = GameResult.objects.filter(
         user=user,
-        end_reason="checkmate"
+        end_reason="checkmate",
+        winner=F("player_color")
     ).count()
 
     stalemates = GameResult.objects.filter(
@@ -155,10 +156,10 @@ def check_game_achievements(user):
         unlock_achievement(user, "PLAY_10")
 
     if total_games >= 20:
-        unlock_achievement(user, "PLAY_100")
+        unlock_achievement(user, "PLAY_20")
     
     if total_games >= 50:
-        unlock_achievement(user, "PLAY_20")
+        unlock_achievement(user, "PLAY_50")
     
     if total_games >= 100:
         unlock_achievement(user, "PLAY_100")
@@ -221,7 +222,7 @@ def check_puzzle_achievements(user, stats):
     if stats.puzzles_solved >= 100:
         unlock_achievement(user, "PUZZLE_100")
         
-    if stats.puzzle_solved >= 200:
+    if stats.puzzles_solved >= 200:
         unlock_achievement(user, "PUZZLE_200")
         
     if stats.current_streak >= 3:
