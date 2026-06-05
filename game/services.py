@@ -170,7 +170,7 @@ def check_game_achievements(user):
     if checkmates >= 1:
         unlock_achievement(user, "FIRST_CHECKMATE")
 
-    if checkmates>= 5:
+    if checkmates >= 5:
         unlock_achievement(user, "FIFTH_CHECKMATE")
     
     if checkmates >= 10:

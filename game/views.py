@@ -89,7 +89,7 @@ def record_game_result(request, mode, winner, reason, player_color='white', move
             moves = game_data.get('move_history', [])
         else:
             moves = []
-    result = GameResult.objects.create(
+    GameResult.objects.create(
         user=user,
         mode=mode,
         winner=winner,
