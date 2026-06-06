@@ -561,13 +561,15 @@ body {
 /* Last-move highlight */
 .square.last-move.light { background-color: var(--sq-last-light); }
 .square.last-move.dark  { background-color: var(--sq-last-dark); }
-.custom-highlight.light {
-    background-color: rgba(80, 180, 255, 0.45) ;
+
+.chessboard .custom-highlight.light {
+    background-color: rgba(80, 180, 255, 0.45);
 }
 
-.custom-highlight.dark {
-    background-color: rgba(40, 120, 220, 0.55) ;
+.chessboard .custom-highlight.dark {
+    background-color: rgba(40, 120, 220, 0.55);
 }
+
 
 .square.premove {
     outline: 2px dashed #3b82f6 !important;
@@ -1735,6 +1737,7 @@ body {
     white-space: nowrap;
     pointer-events: none;
 }
+
   
 @media (max-width: 768px) {
     .chessboard.paused::after {
