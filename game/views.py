@@ -606,16 +606,35 @@ def check_username(request):
     return JsonResponse({'available': not exists})
 
 
+REGISTRATION_SESSION_KEYS = (
+    'registration_user_id',
+    'registration_otp_hash',
+    'otp_created_at',
+    'registration_email',
+    'otp_failed_attempts',
+)
+
+
 def _clear_registration_session(request):
-    """Clear all registration-related keys from the session."""
-    keys = [
-        'registration_user_id',
-        'registration_otp_hash',
-        'otp_created_at',
-        'registration_email',
-        'otp_failed_attempts',
-    ]
-    for key in keys:
+    """Clear all registration-related keys from the session and cache."""
+    user_id = request.session.get('registration_user_id')
+    email = None
+    if user_id == -1:
+        email = request.session.get('registration_email')
+    elif user_id:
+        try:
+            user = User.objects.get(id=user_id)
+            email = user.email
+        except User.DoesNotExist:
+            email = None
+
+    if email:
+        email_hash = hashlib.sha256(email.lower().strip().encode()).hexdigest()
+        cache.delete(f"otp_failed_attempts_{email_hash}")
+    else:
+        cache.delete(f"otp_failed_attempts_session_{request.session.session_key}")
+
+    for key in REGISTRATION_SESSION_KEYS:
         request.session.pop(key, None)
 
 
@@ -854,10 +873,37 @@ def verify_otp(request):
         messages.error(request, 'Session expired. Please register again.')
         return redirect('register')
 
-    if 'otp_failed_attempts' not in request.session:
-        request.session['otp_failed_attempts'] = 0
+    # Resolve email for cache-based brute-force protection
+    email_to_lock = None
+    if user_id == -1:
+        email_to_lock = request.session.get('registration_email')
+    else:
+        try:
+            user = User.objects.get(id=user_id)
+            email_to_lock = user.email
+        except User.DoesNotExist:
+            email_to_lock = None
+
+    if email_to_lock:
+        email_hash = hashlib.sha256(email_to_lock.lower().strip().encode()).hexdigest()
+        cache_key = f"otp_failed_attempts_{email_hash}"
+    else:
+        if not request.session.session_key:
+            request.session.create()
+        cache_key = f"otp_failed_attempts_session_{request.session.session_key}"
 
     if request.method == 'POST':
+        # Retrieve attempts from cache and session, taking the maximum
+        cache_attempts = cache.get(cache_key, 0)
+        session_attempts = request.session.get('otp_failed_attempts', 0)
+        otp_failed_attempts = max(session_attempts, cache_attempts)
+        request.session['otp_failed_attempts'] = otp_failed_attempts
+
+        if otp_failed_attempts >= 5:
+            _clear_registration_session(request)
+            messages.error(request, 'Too many incorrect attempts. Please register again.')
+            return redirect('register')
+
         otp_created_at = request.session.get('otp_created_at')
 
         if otp_created_at:
@@ -868,10 +914,11 @@ def verify_otp(request):
                     request,
                     'OTP has expired. Please register again.',
                 )
-                failed_attempts = request.session.get('otp_failed_attempts')
                 _clear_registration_session(request)
-                if failed_attempts is not None:
-                    request.session['otp_failed_attempts'] = failed_attempts
+                # Preserve the attempts counter across expiration in both session and cache
+                if otp_failed_attempts is not None:
+                    request.session['otp_failed_attempts'] = otp_failed_attempts
+                    cache.set(cache_key, otp_failed_attempts, timeout=900)
 
                 return redirect('register')
 
@@ -935,8 +982,9 @@ def verify_otp(request):
 
         else:
             # Increment failed attempts
-            otp_failed_attempts = request.session.get('otp_failed_attempts', 0) + 1
+            otp_failed_attempts += 1
             request.session['otp_failed_attempts'] = otp_failed_attempts
+            cache.set(cache_key, otp_failed_attempts, timeout=900)
 
             if otp_failed_attempts >= 5:
                 _clear_registration_session(request)

@@ -2308,4 +2308,29 @@ class OtpBruteForceProtectionTest(TestCase):
         messages_list = [m.message for m in get_messages(response.wsgi_request)]
         self.assertIn('Registration successful! Welcome to Checkora.', messages_list)
 
+    def test_lockout_retained_after_session_cleared_by_attacker(self):
+        """Even if the attacker clears/resets their session attempts, the server-side cache retains attempts."""
+        session = self.client.session
+        session['registration_user_id'] = self.user.id
+        session['registration_otp_hash'] = self.correct_hash
+        session['otp_created_at'] = time.time()
+        session['registration_email'] = self.user.email
+        session['otp_failed_attempts'] = 4
+        session.save()
+
+        import hashlib
+        from django.core.cache import cache
+        email_hash = hashlib.sha256(self.user.email.lower().strip().encode()).hexdigest()
+        cache_key = f"otp_failed_attempts_{email_hash}"
+        cache.set(cache_key, 4, timeout=900)
+
+        session = self.client.session
+        session['otp_failed_attempts'] = 0
+        session.save()
+
+        response = self.client.post(self.verify_url, {'otp': '000000'}, follow=True)
+        self.assertRedirects(response, self.register_url)
+        self.assertContains(response, 'Too many incorrect attempts. Please register again.')
+
+
 
