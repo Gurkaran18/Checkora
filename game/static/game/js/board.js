@@ -3767,10 +3767,37 @@
                 });
             }
 
+            // Coordinates Visibility Preference
+            function initCoordinatesToggle() {
+                const showCoordsBtn = document.getElementById('showCoordinatesCheckbox');
+                if (!showCoordsBtn) return;
+
+                const savedShowCoords = localStorage.getItem('showCoordinates') !== 'false';
+                showCoordsBtn.checked = savedShowCoords;
+
+                if (!savedShowCoords && boardEl) {
+                    boardEl.classList.add('hide-coordinates');
+                }
+
+                showCoordsBtn.addEventListener('change', () => {
+                    if (showCoordsBtn.checked) {
+                        if (boardEl) boardEl.classList.remove('hide-coordinates');
+                        localStorage.setItem('showCoordinates', 'true');
+                    } else {
+                        if (boardEl) boardEl.classList.add('hide-coordinates');
+                        localStorage.setItem('showCoordinates', 'false');
+                    }
+                });
+            }
+
             if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', initThemeSwitcher);
+                document.addEventListener('DOMContentLoaded', () => {
+                    initThemeSwitcher();
+                    initCoordinatesToggle();
+                });
             } else {
                 initThemeSwitcher();
+                initCoordinatesToggle();
             }
 
     document.addEventListener('visibilitychange', async() => {

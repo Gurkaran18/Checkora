@@ -2562,3 +2562,77 @@ body.blindfold-mode .capture-ring {
         0 0 12px rgba(76, 175, 80, 0.6);
     border-radius: 4px;
 }
+
+/* ============================================================
+   Coordinates Visibility Preference
+   ============================================================ */
+.preference-container {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.custom-checkbox {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border: 1px solid #444;
+    border-radius: 4px;
+    outline: none;
+    background-color: #1a1a2e;
+    cursor: pointer;
+    display: grid;
+    place-content: center;
+    transition: all 0.2s ease;
+}
+
+.custom-checkbox:hover {
+    border-color: #f0c040;
+}
+
+.custom-checkbox:checked {
+    background-color: #f0c040;
+    border-color: #f0c040;
+}
+
+.custom-checkbox::before {
+    content: "";
+    width: 10px;
+    height: 10px;
+    transform: scale(0);
+    transition: 120ms transform ease-in-out;
+    box-shadow: inset 1em 1em #1a1a2e;
+    transform-origin: bottom left;
+    clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+.custom-checkbox:checked::before {
+    transform: scale(1);
+}
+
+.preference-label {
+    color: #ccc;
+    font-size: 0.85rem;
+    cursor: pointer;
+    user-select: none;
+    transition: color 0.2s ease;
+}
+
+.preference-label:hover {
+    color: #f0c040;
+}
+
+/* Hide chessboard coordinate labels when .hide-coordinates is active on the main #board */
+.board-row:has(#board.hide-coordinates) .ranks,
+.board-aligned:has(#board.hide-coordinates) .files {
+    visibility: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+}
+
