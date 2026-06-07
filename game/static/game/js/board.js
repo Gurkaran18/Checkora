@@ -2246,19 +2246,22 @@
                 replayMoves = [];
                 replayIndex = 0;
 
-                // USE ORIGINAL HISTORY INSTEAD OF REVERSED DOM
-                const moveSpans = document.querySelectorAll('.move-white, .move-black');
+                // Reverse the rows so we get the oldest moves first
+                const moveRows = Array.from(document.querySelectorAll('.move-row')).reverse();
 
-                moveSpans.forEach(span => {
-                    const move = span.textContent
-                        ?.replace(/[+#]/g, '')
-                        ?.replace(/\s+/g, '')
-                        ?.trim();
+                moveRows.forEach(row => {
+                    const spans = row.querySelectorAll('.move-white, .move-black');
+                    spans.forEach(span => {
+                        const move = span.textContent
+                            ?.replace(/[+#]/g, '')
+                            ?.replace(/\s+/g, '')
+                            ?.trim();
 
-                    if (move && move !== '...') {
-                        console.log("Replay move added:", move);
-                        replayMoves.push(move);
-                    }
+                        if (move && move !== '...') {
+                            console.log("Replay move added:", move);
+                            replayMoves.push(move);
+                        }
+                    });
                 });
 
                 console.log("FINAL REPLAY MOVES:", replayMoves);
