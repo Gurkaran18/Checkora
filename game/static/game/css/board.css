@@ -188,7 +188,8 @@ body {
 }
 
 .dropdown-content{
-    display: none;
+    opacity: 0;
+    visibility: hidden;
     position: absolute;
     right: 0;
     top: 100%;
@@ -200,10 +201,21 @@ body {
     overflow: hidden;
     box-shadow: 0 10px 30px rgba(0,0,0,0.4);
     z-index: 9999;
+    transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
+    transform: translateY(10px);
+    pointer-events: none;
 }
 
-.profile-dropdown:hover .dropdown-content{
-    display: block;
+.profile-dropdown.active .dropdown-content{
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+    pointer-events: auto;
+    transition-delay: 0s;
+}
+
+.profile-dropdown:not(.active) .dropdown-content {
+    transition-delay: 0.15s;
 }
 
 .dropdown-content a,
