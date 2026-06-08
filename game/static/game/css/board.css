@@ -26,19 +26,18 @@ body {
    ============================================================ */
 
    .header { 
-    padding: 20px 0 8px; 
-    position: relative;
+    padding: 20px 32px 8px;
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
     width: 100%;
 }
 
 .logo-container {
     display: flex;
     align-items: center;
-    justify-content: center;
     gap: 8px;
+    flex-wrap: nowrap;
 }
 
 /* Logo home link */
@@ -113,10 +112,12 @@ body {
     padding: 2px 8px;
     border-radius: 4px;
     border: 1px solid rgba(212, 165, 116, 0.3);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .auth-buttons {
-    position: absolute;
+    /* position: absolute; */
     right: 24px;
     top: 50%;
     transform: translateY(-50%);
@@ -1022,6 +1023,7 @@ body {
     .logo-container {
         gap: 6px;
         margin-bottom: 4px;
+        margin-left: 16px;
     }
     
     .logo-text {
