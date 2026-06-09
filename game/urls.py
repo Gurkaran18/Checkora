@@ -5,7 +5,6 @@ urlpatterns = [
     path('', views.preloader, name='preloader'),
     path('home/', views.landing, name='landing'),
     path('play/', views.index, name='index'),
-    path('disclaimer/', views.disclaimer, name='disclaimer'),  # Platform Disclaimer Page
     
     # Game API Endpoints
     path('api/move/', views.make_move, name='make_move'),
@@ -42,13 +41,14 @@ urlpatterns = [
     
     # Features & Progressions
     path('leaderboard/', views.leaderboard_view, name='leaderboard'),
-    path('lessons/', views.lessons_view, name='lessons'),
+    path("lessons/", views.lesson_map_view, name="lessons"),
     path('lessons/<str:lesson_name>/', views.lesson_detail_view, name='lesson_detail'),
     path('lessons/<str:lesson_name>/complete/', views.complete_lesson, name='complete_lesson'),
     path("api/puzzle-stats/", views.puzzle_stats_view, name="puzzle_stats"),
     
     # Badges & Achievements
     path("achievements/", views.achievements_view, name="achievements"),
+    path("achievement/<int:achievement_id>/download/", views.download_badge, name="download_badge",),
     path("feature-badge/<int:achievement_id>/", views.feature_badge, name="feature_badge"),
     path("remove-featured-badge/<int:badge_id>/", views.remove_featured_badge, name="remove_featured_badge"),
 ]
