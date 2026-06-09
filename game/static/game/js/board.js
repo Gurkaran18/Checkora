@@ -909,6 +909,20 @@
 
     function createAnim(p, dRow, dCol) {
         return new Promise(resolve => {
+            const originSquare = p.parentElement;
+
+            if (originSquare) {
+               const ghost = p.cloneNode(true);
+               ghost.classList.add('piece-ghost');
+
+               originSquare.appendChild(ghost);
+
+               ghost.addEventListener(
+                  'animationend',
+                   () => ghost.remove(),
+                   { once: true }
+                );
+            }
 
             p.classList.add('moving');
             p.style.transition = 'transform 0.25s ease-in-out, opacity 0.2s ease';
