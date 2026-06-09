@@ -166,16 +166,23 @@ if IS_PRODUCTION:
 
 
 # Email Configuration for OTP and Password Reset EMails
-EMAIL_BACKEND = os.getenv(
-    'EMAIL_BACKEND', 
-    'django.core.mail.backends.smtp.EmailBackend'
-)
+if DEBUG:
+    # Local development: print OTP directly to your terminal screen
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+    DEFAULT_FROM_EMAIL = 'webmaster@localhost'
+else:
+    # Production: use live SMTP settings (configured via Vercel env variables)
+    EMAIL_BACKEND = os.getenv(
+        'EMAIL_BACKEND', 
+        'django.core.mail.backends.smtp.EmailBackend'
+    )
+    DEFAULT_FROM_EMAIL = os.getenv('EMAIL_HOST_USER', '')
+
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 
 # Redirect after login
