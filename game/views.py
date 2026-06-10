@@ -111,11 +111,15 @@ def update_player_rating(user, winner, player_color):
 
     change = calculate_rating_change(result)
 
-    rating.rating = max(
+    new_rating = max(
         100,
         old_rating + change
     )
 
+    actual_change = (
+        new_rating - old_rating
+    )
+    rating.rating = new_rating
     rating.games_played += 1
 
     if result == "win":
@@ -127,13 +131,14 @@ def update_player_rating(user, winner, player_color):
     else:
         rating.draws += 1
 
+    rating.full_clean()
     rating.save()
 
     RatingHistory.objects.create(
         user=user,
         old_rating=old_rating,
         new_rating=rating.rating,
-        rating_change=change,
+        rating_change=actual_change,
         result=result
     )
     

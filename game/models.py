@@ -99,6 +99,7 @@ class UserProgress(models.Model):
         self.full_clean()
         super().save(*args, **kwargs)
 
+
 class PlayerRating(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -131,11 +132,30 @@ class PlayerRating(models.Model):
         auto_now=True
     )
 
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=Q(
+                    games_played=(
+                        models.F("wins")
+                        + models.F("losses")
+                        + models.F("draws")
+                    )
+                ),
+                name="games_played_matches_results",
+            ),
+        ]
+        
     def __str__(self):
         return (
             f"{self.user.username} "
             f"(Rating {self.rating})"
         )
+    
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
 
 class RatingHistory(models.Model):
     RESULT_CHOICES = [
