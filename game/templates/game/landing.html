@@ -475,6 +475,10 @@
     <section id="about" class="about-pin-section">
         <div class="about-pin-sticky">
 
+          <h2 class="section-title">About Us</h2>
+
+          <div class="about-box">
+
             <!-- Progress Bar -->
             <div class="about-progress-bar">
                 <div class="about-progress-fill" id="aboutProgressFill"></div>
@@ -487,7 +491,6 @@
                 <span>4</span>
             </div>
 
-            <h2 class="section-title about-section-title">About Us</h2>
 
             <!-- Track -->
             <div class="about-track-wrapper">
@@ -666,6 +669,7 @@
                 <div class="about-dot" data-index="2"></div>
                 <div class="about-dot" data-index="3"></div>
             </div>
+          </div>
 
         </div>
     </section>
@@ -1450,7 +1454,7 @@
         const viewH     = window.innerHeight;
 
         // We want horizontal sliding to finish after 3 viewports of scrolling
-        const slideScrollable = 3 * viewH;
+        const slideScrollable = (CARD_COUNT - 1) * viewH;
         
         // how far into the sliding portion we've scrolled (0 to 1)
         const scrolled  = Math.max(0, Math.min(1, -rect.top / slideScrollable));
