@@ -82,12 +82,6 @@ from django.http import FileResponse
 
 from .analysis import build_summary
 
-from django.utils import timezone
-from datetime import timedelta
-import chess
-import chess.pgn
-import io
-
 def landing(request):
     """Render the landing page introduction to Checkora."""
     return render(request, 'game/landing.html')
@@ -2950,59 +2944,3 @@ def download_badge(request, achievement_id):
         return HttpResponseServerError(
             "Badge generation failed."
         )
-
-@login_required
-def get_recent_replay(request):
-    cutoff = timezone.now() - timedelta(hours=48)
-    game = (
-        GameResult.objects
-        .filter(user=request.user, played_at__gte=cutoff)
-        .order_by("-played_at")
-        .first()
-    )
-
-    if not game:
-        return JsonResponse({"error": "No recent match found within 48 hours."}, status=404)
-
-    # Build PGN from moves array
-    board = chess.Board()
-    pgn_game = chess.pgn.Game()
-    pgn_game.headers["Result"] = (
-        "1-0" if game.winner == "white" else
-        "0-1" if game.winner == "black" else
-        "1/2-1/2"
-    )
-    pgn_game.headers["Termination"] = game.end_reason
-    pgn_game.headers["Date"] = game.played_at.strftime("%Y.%m.%d")
-
-    node = pgn_game
-    for move_str in game.moves:
-        try:
-            move = board.parse_san(move_str)
-            node = node.add_variation(move)
-            board.push(move)
-        except Exception:
-            # Try UCI format as fallback
-            try:
-                move = board.parse_uci(move_str)
-                node = node.add_variation(move)
-                board.push(move)
-            except Exception:
-                break
-
-    exporter = io.StringIO()
-    print(pgn_game, file=exporter)
-    pgn_string = exporter.getvalue()
-
-    return JsonResponse({
-        "pgn": pgn_string,
-        "mode": game.mode,
-        "winner": game.winner,
-        "end_reason": game.end_reason,
-        "player_color": game.player_color,
-        "played_at": game.played_at.isoformat(),
-    })
-
-def replay_view(request):
-    """Renders the Replay dashboard."""
-    return render(request, 'game/replay.html')
