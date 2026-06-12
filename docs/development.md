@@ -133,7 +133,7 @@ http://127.0.0.1:8000/
 Collect static files when needed:
 
 ```bash
-python manage.py collectstatic
+python manage.py collectstatic --noinput
 ```
 
 ---
