@@ -2846,26 +2846,46 @@
         updateThinkingDots();
     }
 
-    function updatePauseUI() {
-        pauseBtn.textContent = paused ? 'Resume' : 'Pause';
-        pauseBtn.classList.toggle('paused', paused);
-        boardEl.classList.toggle('paused', paused);
-        updateThinkingDots();
-        if (paused) {
-            boardEl.setAttribute('aria-label', 'Game paused. Click board or press P to resume.');
-            boardEl.style.cursor = 'pointer';
-            boardEl.style.pointerEvents = 'auto';
-        } else {
-            boardEl.removeAttribute('aria-label');
-            boardEl.style.cursor = '';
-            boardEl.style.pointerEvents = '';
-        }
-    }
+            function updatePauseUI() {
+    pauseBtn.innerHTML =
+    `${paused ? 'Resume' : 'Pause'}<span class="btn-shortcut">P</span>`;
+    pauseBtn.classList.toggle('paused', paused);
+    boardEl.classList.toggle('paused', paused);
 
-    function startTimer() {
-        clearInterval(timerInterval);
-        timerInterval = setInterval(() => {
-            if (paused || gameOver) return;
+    // Mobile FAB icon toggle
+    const pauseFabIcon = document.getElementById('pauseFabIcon');
+    const playFabIcon = document.getElementById('playFabIcon');
+    const pauseFab = document.getElementById('pauseFab');
+
+    if (pauseFabIcon && playFabIcon) {
+        pauseFabIcon.style.display = paused ? 'none' : 'block';
+        playFabIcon.style.display = paused ? 'block' : 'none';
+    }
+    if (pauseFab) {
+    const fabLabel = paused ? 'Resume' : 'Pause';
+    pauseFab.title = fabLabel;
+    pauseFab.setAttribute('aria-label', fabLabel);
+}
+
+    updateThinkingDots();
+
+    if (paused) {
+        boardEl.setAttribute(
+            'aria-label',
+            'Game paused. Click board or press P to resume.'
+        );
+        boardEl.style.cursor = 'pointer';
+        boardEl.style.pointerEvents = 'auto';
+    } else {
+        boardEl.removeAttribute('aria-label');
+        boardEl.style.cursor = '';
+        boardEl.style.pointerEvents = '';
+    }
+}
+            function startTimer() {
+                clearInterval(timerInterval);
+                timerInterval = setInterval(() => {
+                    if (paused || gameOver) return;
 
             // fix: in AI mode, tick only ONE clock exclusively
             if (gameMode === 'ai') {

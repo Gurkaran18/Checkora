@@ -73,13 +73,28 @@
 
     <!-- MOBILE FAB -->
 <div class="m-fab" id="mFab">
-  <button class="m-fab-btn" title="Pause"
-    onclick="document.getElementById('pauseBtn').click()">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-      <rect x="5" y="3" width="4" height="18" rx="1.5"/>
-      <rect x="15" y="3" width="4" height="18" rx="1.5"/>
-    </svg>
-  </button>
+  <button
+  type="button"
+  class="m-fab-btn"
+  id="pauseFab"
+  title="Pause"
+  onclick="document.getElementById('pauseBtn').click()">
+
+  <svg id="pauseFabIcon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+    <rect x="5" y="3" width="4" height="18" rx="1.5"/>
+    <rect x="15" y="3" width="4" height="18" rx="1.5"/>
+  </svg>
+
+  <svg id="playFabIcon"
+       width="16"
+       height="16"
+       viewBox="0 0 24 24"
+       fill="currentColor"
+       style="display:none;">
+    <path d="M8 5v14l11-7z"/>
+  </svg>
+
+</button>
   <button class="m-fab-btn m-fab-resign" title="Resign"
     onclick="document.getElementById('resignBtn').click()">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
