@@ -112,7 +112,7 @@ If you see the error *"Script execution is disabled on this system"*, run the fo
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
-This temporarily allows script execution for the current session.
+This temporarily allows script execution for the current session. For more details, see the [Troubleshooting Guide](#troubleshooting-guide).
 
 **On macOS / Linux:**
 ```bash
