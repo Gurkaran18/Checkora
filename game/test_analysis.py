@@ -167,6 +167,8 @@ class AnalysisTest(TestCase):
             content_type='application/json'
         )
         self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn('total_moves', data)
 
     def test_api_endpoint_move_string_exact_limit(self):
         self.client.force_login(self.user)
