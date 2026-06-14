@@ -1621,9 +1621,7 @@ def logout_view(request):
 def stats_view(request):
     """Display game statistics."""
     # Only show real database records linked to the logged-in user
-    user_results = GameResult.objects.filter(
-        user=request.user
-    ).exclude(mode__in=['', None])
+    user_results = request.user.game_results.all().exclude(mode__in=['', None])
 
     total_games = user_results.count()
 

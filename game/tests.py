@@ -1326,24 +1326,24 @@ class StatsCleanupTest(TestCase):
     def test_user_isolation(self):
         """Users should only see their own game results."""
         # Create game for user A
-        self.GameResult.objects.create(user=self.user_a, mode='pvp', winner='white', end_reason='checkmate')
+        self.user_a.game_results.create(mode='pvp', winner='white', end_reason='checkmate')
         # Create game for user B
-        self.GameResult.objects.create(user=self.user_b, mode='ai', winner='black', end_reason='resign')
+        self.user_b.game_results.create(mode='ai', winner='black', end_reason='resign')
 
         # Check as User A
         self.client.login(username='usera', password='password123')
         response = self.client.get('/stats/')
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'PvP')
-        self.assertNotContains(response, 'AI')
+        self.assertContains(response, '<td>PvP</td>')
+        self.assertNotContains(response, '<td>AI</td>')
         self.client.logout()
 
         # Check as User B
         self.client.login(username='userb', password='password123')
         response = self.client.get('/stats/')
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'AI')
-        self.assertNotContains(response, 'PvP')
+        self.assertContains(response, '<td>AI</td>')
+        self.assertNotContains(response, '<td>PvP</td>')
 
     def test_empty_stats_page(self):
         """Users with no games should see a clean empty state."""
