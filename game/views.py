@@ -189,7 +189,7 @@ def record_game_result(request, mode, winner, reason, player_color='white', move
         )
         
         check_game_achievements(user)
-        return result
+    return result
 
 
 @require_POST
