@@ -4597,3 +4597,20 @@
     });
 
 })();
+// Enable Enter key submission for Game Setup / Lobby configurations
+const setupInputs = document.querySelectorAll('#player-name-input, .setup-menu input, #config-panel input, input[type="text"]');
+
+setupInputs.forEach(input => {
+    input.addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') {
+            event.preventDefault(); // Input event bubbling ko roko
+            
+            // Game initialisation buttons ko target karo
+            const startGameBtn = document.querySelector('#start-game-btn') || document.querySelector('.play-btn') || document.querySelector('#play-vs-ai');
+            
+            if (startGameBtn) {
+                startGameBtn.click();
+            }
+        }
+    });
+});

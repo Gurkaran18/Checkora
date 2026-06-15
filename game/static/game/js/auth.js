@@ -220,3 +220,21 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 });
+// Enable Enter key submission for Authentication Forms
+    const authInputs = document.querySelectorAll('.auth-container input, .login-form input, .signup-form input, input[type="password"]');
+    
+    authInputs.forEach(input => {
+        input.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault(); // Default submit refresh ko roko
+                
+                // Form ya container ke submit button ko click trigger karo
+                const container = input.closest('form') || input.closest('.auth-container') || document;
+                const submitBtn = container.querySelector('button[type="submit"]') || container.querySelector('.submit-btn') || container.querySelector('#submit-btn');
+                
+                if (submitBtn) {
+                    submitBtn.click();
+                }
+            }
+        });
+    });
