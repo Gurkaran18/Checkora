@@ -58,4 +58,17 @@ urlpatterns = [
     path("forum/new/", views.forum_new, name="forum_new"),
     path("forum/<int:discussion_id>/", views.forum_detail, name="forum_detail"),
     path("forum/<int:discussion_id>/reply/", views.forum_reply, name="forum_reply"),
+
+    # Reply actions
+    path(
+        "forum/reply/<int:reply_id>/edit/",
+        views.forum_reply_edit,
+        name="forum_reply_edit",
+    ),
+
+    path(
+        "forum/reply/<int:reply_id>/delete/",
+        views.forum_reply_delete,
+        name="forum_reply_delete",
+    ),
 ]
