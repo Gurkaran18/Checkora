@@ -48,8 +48,7 @@ urlpatterns = [
     # Opening Trainer
     path("openings/", views.opening_trainer, name="opening_trainer"),
     path("openings/<slug:slug>/", views.opening_detail, name="opening_detail"),
-    path("openings/", views.opening_trainer, name="opening_trainer"),
-    path("openings/<slug:slug>/", views.opening_detail, name="opening_detail"),
+
     path("api/puzzle-stats/", views.puzzle_stats_view, name="puzzle_stats"),
     path("api/puzzles/daily/", views.get_daily_puzzle, name="daily_puzzle"),
     

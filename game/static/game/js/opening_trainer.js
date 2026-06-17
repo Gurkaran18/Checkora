@@ -1,5 +1,14 @@
+const movesElement =
+    document.getElementById("opening-moves");
+
+if (!movesElement) {
+    throw new Error(
+        "opening-moves element not found"
+    );
+}
+
 const OPENING_MOVES = JSON.parse(
-    document.getElementById("opening-moves").textContent
+    movesElement.textContent
 );
 
 let currentMove = 0;
@@ -36,7 +45,7 @@ function validateMove(move) {
     const expectedMove =
         OPENING_MOVES[currentMove];
 
-    if (move === expectedMove) {
+    if (move.toLowerCase() === expectedMove.toLowerCase()) {
 
         currentMove++;
 

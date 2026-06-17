@@ -38,13 +38,18 @@
         <div id="move-progress">
             0 / {{ opening.moves|length }}
         </div>
+        <label for="move-input">
+            Enter Move
+        </label>
         <input
             type="text"
             id="move-input"
             placeholder="Enter move (e4, Nf3...)"
         />
 
-        <button id="check-move-btn">
+        <button 
+            type="button"
+            id="check-move-btn">
             Check Move
         </button>
     </div>

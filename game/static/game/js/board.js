@@ -78,11 +78,6 @@
     let currentDifficulty = 'medium';
     let currentWhiteName = 'White';
     let currentBlackName = 'Black';
-
-    let openingTrainerMode = false;
-    let openingTrainerSteps = [];
-    let currentTrainerStep = 0;
-    
     // Updates UI to highlight selected game mode button
     function updateModeButtonsUI(mode) {
         const pvpBtn = document.getElementById("newPvPBtn");
