@@ -185,6 +185,9 @@ body {
     font-weight: 600;
 }
 .btn-logout {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     color: #ff6b6b;
     text-decoration: none;
     font-size: 0.85rem;
@@ -192,14 +195,35 @@ body {
     padding: 5px 10px;
     border-radius: 4px;
     background: rgba(255, 107, 107, 0.1);
+    transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease;
+}
+.btn-logout:hover {
+    background: rgba(255, 107, 107, 0.28);
+    color: #ffffff;
+    transform: translateY(-1px);
 }
 .btn-signin {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     color: #f0c040;
     text-decoration: none;
     font-size: 0.9rem;
     font-weight: 600;
+    padding: 6px 12px;
+    border-radius: 6px;
+    transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+}
+.btn-signin:hover {
+    background: rgba(201, 168, 76, 0.12);
+    color: #FFD700;
+    box-shadow: 0 0 12px rgba(201, 168, 76, 0.2);
+    transform: translateY(-1px);
 }
 .btn-register {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     background: #f0c040;
     color: #1a1a2a;
     text-decoration: none;
@@ -207,6 +231,12 @@ body {
     border-radius: 6px;
     font-size: 0.9rem;
     font-weight: 600;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, filter 0.25s ease;
+}
+.btn-register:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px rgba(240, 192, 64, 0.3);
+    filter: brightness(1.06);
 }
 
 .profile-dropdown{
@@ -3038,4 +3068,3 @@ body.blindfold-mode .capture-ring {
     pointer-events: none;
     transition: opacity 0.2s ease, visibility 0.2s ease;
 }
-

@@ -185,7 +185,12 @@
             outline-offset: -2px;
         }
 
-        .rule-nav-item .icon { font-size: 1.1rem; width: 22px; text-align: center; }
+        .rule-nav-item .icon {
+            font-size: 1.1rem;
+            width: 22px;
+            text-align: center;
+            transition: transform 0.15s ease;
+        }
 
         /* ── Main Content ── */
         main {
@@ -630,6 +635,23 @@
             .value-note {
                 display: block;
                 font-size: 0.82rem;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .sidebar .rule-nav-item:hover,
+            .sidebar .rule-nav-item:active,
+            .sidebar .rule-nav-item.is-hovered {
+                background: rgba(244, 196, 48, 0.16);
+                color: var(--gold);
+                border-left-color: var(--gold);
+                box-shadow: inset 0 0 0 1px rgba(244, 196, 48, 0.08);
+            }
+
+            .sidebar .rule-nav-item:hover .icon,
+            .sidebar .rule-nav-item:active .icon,
+            .sidebar .rule-nav-item.is-hovered .icon {
+                transform: translateX(2px);
             }
         }
     </style>
@@ -1333,6 +1355,18 @@ window.onload = () => {
 };
 
 document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.rule-nav-item').forEach(item => {
+        const showHoverState = () => item.classList.add('is-hovered');
+        const hideHoverState = () => item.classList.remove('is-hovered');
+
+        item.addEventListener('pointerenter', showHoverState);
+        item.addEventListener('pointerleave', hideHoverState);
+        item.addEventListener('mouseenter', showHoverState);
+        item.addEventListener('mouseleave', hideHoverState);
+        item.addEventListener('focus', showHoverState);
+        item.addEventListener('blur', hideHoverState);
+    });
+
     const backBtn = document.getElementById('dynamicBackBtn');
     if (!backBtn) return;
 
