@@ -225,7 +225,62 @@ class LessonProgress(models.Model):
             f"{self.user.username} - "
             f"{self.lesson_name}"
         )
-        
+    
+class OpeningProgress(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="opening_progress"
+    )
+
+    opening_name = models.CharField(
+        max_length=100
+    )
+
+    openings_started = models.PositiveIntegerField(
+        default=0
+    )
+
+    openings_completed = models.PositiveIntegerField(
+        default=0
+    )
+
+    correct_moves = models.PositiveIntegerField(
+        default=0
+    )
+
+    incorrect_moves = models.PositiveIntegerField(
+        default=0
+    )
+
+    last_checkpoint = models.PositiveIntegerField(
+        default=0
+    )
+
+    completion_percentage = models.FloatField(
+        default=0
+    )
+
+    accuracy_percentage = models.FloatField(
+        default=0
+    )
+
+    last_practiced = models.DateTimeField(
+        auto_now=True
+    )
+
+    class Meta:
+        unique_together = (
+            "user",
+            "opening_name"
+        )
+
+    def __str__(self):
+        return (
+            f"{self.user.username} - "
+            f"{self.opening_name}"
+        )
+         
 class Achievement(models.Model):
     CATEGORY_CHOICES = [
         ("gameplay", "Gameplay"),
@@ -404,3 +459,5 @@ class Reply(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.discussion.title}"
+    
+    

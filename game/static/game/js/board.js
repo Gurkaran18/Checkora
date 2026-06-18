@@ -399,7 +399,7 @@
         clearPuzzleHints();
 
         await startNewGame(
-            "pvp",
+            "ai",
             "white",
             "medium",
             currentPuzzle.fen,
@@ -3208,8 +3208,10 @@
         blackAlertFired = false;
 
         gameStartTime = Date.now();
-
-        gameMode = d.mode;
+        
+        if (!isPuzzle) {
+            gameMode = d.mode;
+        }
         playerColor = d.player_color || 'white';
         currentDifficulty = d.difficulty || difficulty;
         if (resignBtn) {
@@ -3228,7 +3230,14 @@
             flipped = false;
         }
 
-        if (modeBadge) modeBadge.textContent = gameMode === 'ai' ? 'VS AI' : 'PVP';
+        if (modeBadge) {
+            if (isPuzzle) {
+                modeBadge.textContent = 'DAILY PUZZLE';
+            } else {
+                modeBadge.textContent =
+                    gameMode === 'ai' ? 'VS AI' : 'PVP';
+                }
+            }
 
         const emotePanel = document.getElementById('emotePanel');
         if (emotePanel) {
@@ -3242,12 +3251,14 @@
         hints = [];
         await loadGame();
         // Apply active state after UI reload
-        updateModeButtonsUI(gameMode);
+        if (!isPuzzle) {
+            updateModeButtonsUI(gameMode);
+        }
         paused = false;
         updatePauseUI();
 
         // Auto-trigger AI if it's their turn
-        if (gameMode === 'ai' && turn !== playerColor) {
+        if (!isPuzzle && gameMode === 'ai' && turn !== playerColor) {
             queueAIMoveIfNeeded();
         }
 
