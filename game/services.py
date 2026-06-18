@@ -263,7 +263,7 @@ def update_opening_progress(
     if not user:
         return None
 
-    progress, created= OpeningProgress.objects.get_or_create(
+    progress, created = OpeningProgress.objects.get_or_create(
         user=user,
         opening_name=opening_name,
     )
