@@ -74,12 +74,7 @@ urlpatterns = [
     path("forum/new/", views.forum_new, name="forum_new"),
     path("forum/<int:discussion_id>/", views.forum_detail, name="forum_detail"),
     path("forum/<int:discussion_id>/reply/", views.forum_reply, name="forum_reply"),
-]
 
-from game.urls_history import history_urlpatterns
-urlpatterns += history_urlpatterns
-
-    # Reply actions
     path(
         "forum/reply/<int:reply_id>/edit/",
         views.forum_reply_edit,
@@ -92,3 +87,5 @@ urlpatterns += history_urlpatterns
         name="forum_reply_delete",
     ),
 ]
+from game.urls_history import history_urlpatterns
+urlpatterns += history_urlpatterns
