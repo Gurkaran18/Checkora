@@ -366,11 +366,20 @@
                 throw new Error(`Failed to fetch daily puzzle: ${response.statusText}`);
             }
             currentPuzzle = await response.json();
+            if (currentPuzzle && currentPuzzle.id !== 0) {
+                const solResponse = await fetch(`/api/puzzles/${currentPuzzle.id}/solution/`);
+                if (solResponse.ok) {
+                    const solData = await solResponse.json();
+                    currentPuzzle.solution = solData.solution;
+                } else {
+                    throw new Error(`Failed to fetch puzzle solution: ${solResponse.statusText}`);
+                }
+            }
         } catch (error) {
             console.error("Error fetching daily puzzle:", error);
             // Fallback to a default puzzle in case API fails
             currentPuzzle = {
-                id: 1,
+                id: 0,
                 title: "Default Puzzle",
                 fen: "6k1/5ppp/8/8/8/8/5PPP/6KQ w - - 0 1",
                 solution: ["g2g4"],
@@ -399,9 +408,9 @@
         clearPuzzleHints();
 
         await startNewGame(
-            "pvp",
+            "ai",
             "white",
-            "medium",
+            currentPuzzle.difficulty || "medium",
             currentPuzzle.fen,
             null,
             null,
@@ -1001,6 +1010,60 @@
         whiteAlertFired = false;
         blackAlertFired = false;
 
+        const urlParams = new URLSearchParams(window.location.search);
+        const puzzleId = urlParams.get('puzzle_id');
+        if (puzzleId) {
+            // Remove the puzzle_id query param from the URL to prevent recursion loop
+            const url = new URL(window.location);
+            url.searchParams.delete('puzzle_id');
+            window.history.replaceState({}, document.title, url.pathname + url.search);
+
+            try {
+                const response = await fetch(`/api/puzzles/${puzzleId}/`);
+                if (response.ok) {
+                    currentPuzzle = await response.json();
+                    const solResponse = await fetch(`/api/puzzles/${puzzleId}/solution/`);
+                    if (solResponse.ok) {
+                        const solData = await solResponse.json();
+                        currentPuzzle.solution = solData.solution;
+                    }
+                    dailyPuzzleMode = true;
+                    document.getElementById("whiteClock").style.display = "none";
+                    document.getElementById("blackClock").style.display = "none";
+                    document.getElementById("streak-counter").style.display = "block";
+                    updateStreakDisplay();
+                    if (restartPuzzleBtn) restartPuzzleBtn.style.display = 'block';
+                    if (hintPuzzleBtn) hintPuzzleBtn.style.display = 'block';
+                    puzzleMoveIndex = 0;
+                    clearPuzzleHints();
+                    await startNewGame(
+                        "ai",
+                        "white",
+                        currentPuzzle.difficulty || "medium",
+                        currentPuzzle.fen,
+                        null,
+                        null,
+                        true
+                    );
+                    currentPuzzleFen = currentPuzzle.fen;
+                    expectedMoveEval = null;
+                    initStockfish();
+                    precalculateExpectedMoveEval();
+                    const streakData = getPuzzleStreak();
+                    updateStreakDisplay();
+                    showStatus(
+                        `${currentPuzzle.title} | 🔥 Current Streak: ${streakData.streak}`,
+                        false
+                    );
+                    welcomeOverlay.classList.remove('active');
+                    gameLayout.style.visibility = 'visible';
+                    return;
+                }
+            } catch (error) {
+                console.error("Error loading puzzle from query params:", error);
+            }
+        }
+
         const data = await get('/api/state/');
 
         if (data.time_limit !== undefined) {
@@ -1546,6 +1609,41 @@
             if (promotionPiece) body.promotion_piece = promotionPiece;
 
             const data = await post('/api/move/', body);
+
+            // Opening Trainer validation
+            if (openingTrainerMode) {
+                const expectedMove =
+                    openingTrainerSteps[currentTrainerStep]?.expected_move;
+
+                const playedMove =
+                    `${toSquare(fr, fc)}-${toSquare(tr, tc)}`;
+
+                if (
+                    playedMove.toLowerCase() !== expectedMove.toLowerCase()
+                ) {
+                    showStatus(
+                        `Incorrect move. Expected: ${expectedMove}`,
+                        true
+                    );
+
+                    deselect();
+                    return;
+                }
+
+                currentTrainerStep++;
+                if (
+                    currentTrainerStep >=
+                    openingTrainerSteps.length
+                ) {
+                    openingTrainerMode = false;
+
+                    showStatus(
+                        "Opening sequence completed!",
+                        false
+                    );
+                }
+            }
+
             if (data.valid) {
                 illegalMoveCount = 0;
                 playSound(data);
@@ -3173,8 +3271,10 @@
         blackAlertFired = false;
 
         gameStartTime = Date.now();
-
-        gameMode = d.mode;
+        
+        if (!isPuzzle) {
+            gameMode = d.mode;
+        }
         playerColor = d.player_color || 'white';
         currentDifficulty = d.difficulty || difficulty;
         if (resignBtn) {
@@ -3193,7 +3293,14 @@
             flipped = false;
         }
 
-        if (modeBadge) modeBadge.textContent = gameMode === 'ai' ? 'VS AI' : 'PVP';
+        if (modeBadge) {
+            if (isPuzzle) {
+                modeBadge.textContent = 'DAILY PUZZLE';
+            } else {
+                modeBadge.textContent =
+                    gameMode === 'ai' ? 'VS AI' : 'PVP';
+                }
+            }
 
         const emotePanel = document.getElementById('emotePanel');
         if (emotePanel) {
@@ -3207,12 +3314,14 @@
         hints = [];
         await loadGame();
         // Apply active state after UI reload
-        updateModeButtonsUI(gameMode);
+        if (!isPuzzle) {
+            updateModeButtonsUI(gameMode);
+        }
         paused = false;
         updatePauseUI();
 
         // Auto-trigger AI if it's their turn
-        if (gameMode === 'ai' && turn !== playerColor) {
+        if (!isPuzzle && gameMode === 'ai' && turn !== playerColor) {
             queueAIMoveIfNeeded();
         }
 
@@ -3676,11 +3785,18 @@
             clearPuzzleHints();
 
             await startNewGame(
-                "pvp",
+                "ai",
                 "white",
-                "medium",
-                currentPuzzle.fen
+                currentPuzzle.difficulty || "medium",
+                currentPuzzle.fen,
+                null,
+                null,
+                true
             );
+            currentPuzzleFen = currentPuzzle.fen;
+            expectedMoveEval = null;
+            initStockfish();
+            precalculateExpectedMoveEval();
 
             showStatus(
                 "Puzzle Restarted",

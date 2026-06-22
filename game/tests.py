@@ -2864,7 +2864,7 @@ class ChessPuzzleDailyApiTest(TestCase):
         self.assertEqual(data['id'], expected_puzzle.id)
         self.assertEqual(data['title'], "Today's Special Puzzle")
         self.assertEqual(data['difficulty'], "hard")
-        self.assertEqual(data['solution'], ["e2e4"])
+        self.assertNotIn('solution', data)
 
     def test_daily_puzzle_api_fallback_to_modulo(self):
         """Deterministic fallback when no puzzle matches today."""
@@ -2962,3 +2962,300 @@ class LeaderboardAndAchievementsViewOriginalTest(TestCase):
         self.assertTemplateUsed(response, 'game/achievements.html')
         self.assertContains(response, "Achievements Unlocked")
         self.assertContains(response, "No featured badges selected yet.")
+        
+    def test_opening_trainer_page(self):
+        response = self.client.get(
+            reverse("opening_trainer")
+        )
+
+        self.assertEqual(response.status_code, 200)
+    
+    def test_opening_detail_page(self):
+        response = self.client.get(
+            reverse(
+                "opening_detail",
+                kwargs={
+                    "slug": "italian-game"
+                }
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+
+
+class UpdatePuzzleStatsViewTest(TestCase):
+    """Test the update_puzzle_stats view function."""
+
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='puzzler',
+            password='Password123!',
+            email='puzzler@example.com'
+        )
+        self.factory = RequestFactory()
+
+    def test_anonymous_user_is_redirected(self):
+        from . import views
+        request = self.factory.post('/api/puzzle-stats/update/', data=json.dumps({}), content_type='application/json')
+        from django.contrib.auth.models import AnonymousUser
+        request.user = AnonymousUser()
+        
+        response = views.update_puzzle_stats(request)
+        self.assertEqual(response.status_code, 302)
+
+    def test_non_post_request_returns_405(self):
+        from . import views
+        request = self.factory.get('/api/puzzle-stats/update/')
+        request.user = self.user
+        response = views.update_puzzle_stats(request)
+        self.assertEqual(response.status_code, 405)
+
+    def test_invalid_json_returns_400(self):
+        from . import views
+        request = self.factory.post('/api/puzzle-stats/update/', data="invalid-json", content_type='application/json')
+        request.user = self.user
+        response = views.update_puzzle_stats(request)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(json.loads(response.content), {'error': 'invalid json'})
+
+    def test_non_object_json_returns_400(self):
+        from . import views
+        request = self.factory.post(
+            '/api/puzzle-stats/update/',
+            data=json.dumps([]),
+            content_type='application/json'
+        )
+        request.user = self.user
+        response = views.update_puzzle_stats(request)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('error', json.loads(response.content))
+
+    def test_valid_json_updates_stats(self):
+        from . import views
+        payload = {
+            'puzzles_solved': 5,
+            'current_streak': 3,
+            'best_streak': 5,
+            'daily_completions': 1
+        }
+        request = self.factory.post('/api/puzzle-stats/update/', data=json.dumps(payload), content_type='application/json')
+        request.user = self.user
+        response = views.update_puzzle_stats(request)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.content), {'success': True})
+        
+        from game.models import PuzzleStats
+        stats = PuzzleStats.objects.get(user=self.user)
+        self.assertEqual(stats.puzzles_solved, 5)
+        self.assertEqual(stats.current_streak, 3)
+        self.assertEqual(stats.best_streak, 5)
+        self.assertEqual(stats.daily_completions, 1)
+
+    def test_partial_json_payload_uses_existing_stats(self):
+        from . import views
+        from game.models import PuzzleStats
+        PuzzleStats.objects.create(
+            user=self.user,
+            puzzles_solved=10,
+            current_streak=4,
+            best_streak=10,
+            daily_completions=2
+        )
+        
+        payload = {
+            'current_streak': 5,
+            'best_streak': 12
+        }
+        request = self.factory.post('/api/puzzle-stats/update/', data=json.dumps(payload), content_type='application/json')
+        request.user = self.user
+        response = views.update_puzzle_stats(request)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.content), {'success': True})
+        
+        stats = PuzzleStats.objects.get(user=self.user)
+        self.assertEqual(stats.current_streak, 5)
+        self.assertEqual(stats.best_streak, 12)
+        self.assertEqual(stats.puzzles_solved, 10)
+        self.assertEqual(stats.daily_completions, 2)
+
+    def test_negative_values_return_400(self):
+        from . import views
+        payload = {
+            'puzzles_solved': -1,
+            'current_streak': 3,
+            'best_streak': 5,
+            'daily_completions': 1
+        }
+        request = self.factory.post('/api/puzzle-stats/update/', data=json.dumps(payload), content_type='application/json')
+        request.user = self.user
+        response = views.update_puzzle_stats(request)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('error', json.loads(response.content))
+
+    def test_non_integer_values_return_400(self):
+        from . import views
+        payload = {
+            'puzzles_solved': "five",
+            'current_streak': 3,
+            'best_streak': 5,
+            'daily_completions': 1
+        }
+        request = self.factory.post('/api/puzzle-stats/update/', data=json.dumps(payload), content_type='application/json')
+        request.user = self.user
+        response = views.update_puzzle_stats(request)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('error', json.loads(response.content))
+
+    def test_boolean_values_return_400(self):
+        from . import views
+        payload = {
+            'puzzles_solved': True,
+            'current_streak': 3,
+            'best_streak': 5,
+            'daily_completions': 1
+        }
+        request = self.factory.post('/api/puzzle-stats/update/', data=json.dumps(payload), content_type='application/json')
+        request.user = self.user
+        response = views.update_puzzle_stats(request)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('error', json.loads(response.content))
+
+    def test_streak_constraint_failure_returns_400(self):
+        from . import views
+        payload = {
+            'puzzles_solved': 5,
+            'current_streak': 5,
+            'best_streak': 3,
+            'daily_completions': 1
+        }
+        request = self.factory.post('/api/puzzle-stats/update/', data=json.dumps(payload), content_type='application/json')
+        request.user = self.user
+        response = views.update_puzzle_stats(request)
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(json.loads(response.content), {'error': 'best_streak must be greater than or equal to current_streak'})
+
+    def test_invalid_validation_does_not_create_db_record(self):
+        from . import views
+        from game.models import PuzzleStats
+        self.assertFalse(PuzzleStats.objects.filter(user=self.user).exists())
+        payload = {
+            'puzzles_solved': -5,
+        }
+        request = self.factory.post('/api/puzzle-stats/update/', data=json.dumps(payload), content_type='application/json')
+        request.user = self.user
+        response = views.update_puzzle_stats(request)
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(PuzzleStats.objects.filter(user=self.user).exists())
+
+
+class ChessPuzzleDashboardTests(TestCase):
+    """Test suite for the chess puzzle dashboard views and API endpoints."""
+
+    def setUp(self):
+        super().setUp()
+        from game.models import ChessPuzzle
+        ChessPuzzle.objects.all().delete()
+
+        self.puzzle_easy = ChessPuzzle.objects.create(
+            title="Easy Mate in One",
+            fen="8/8/8/8/8/8/8/8 w - - 0 1",
+            solution=["e2e4"],
+            difficulty="easy"
+        )
+        self.puzzle_medium = ChessPuzzle.objects.create(
+            title="Medium Tactics Puzzle",
+            fen="7k/8/8/8/8/8/8/8 w - - 0 1",
+            solution=["d2d4"],
+            difficulty="medium"
+        )
+        self.puzzle_hard = ChessPuzzle.objects.create(
+            title="Hard Endgame Study",
+            fen="6k1/8/8/8/8/8/8/6K1 w - - 0 1",
+            solution=["c2c4"],
+            difficulty="hard"
+        )
+
+    def test_puzzles_view_renders_correct_template(self):
+        """The puzzles dashboard view renders the puzzle_list.html template."""
+        url = reverse('puzzles')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'game/puzzle_list.html')
+
+    def test_puzzles_list_api_returns_all_without_solution(self):
+        """The listing API returns all puzzles and excludes solutions."""
+        url = reverse('puzzles_list_api')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(len(data), 3)
+
+        for item in data:
+            self.assertNotIn('solution', item)
+            self.assertIn('id', item)
+            self.assertIn('title', item)
+            self.assertIn('fen', item)
+            self.assertIn('difficulty', item)
+
+    def test_puzzles_list_api_difficulty_filtering(self):
+        """The listing API supports filtering by difficulty."""
+        url = reverse('puzzles_list_api')
+
+        # Filter easy
+        response = self.client.get(url, {'difficulty': 'easy'})
+        data = response.json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]['title'], "Easy Mate in One")
+
+        # Filter hard
+        response = self.client.get(url, {'difficulty': 'hard'})
+        data = response.json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]['title'], "Hard Endgame Study")
+
+    def test_puzzles_list_api_search_filtering(self):
+        """The listing API supports filtering by search queries on title."""
+        url = reverse('puzzles_list_api')
+
+        response = self.client.get(url, {'search': 'Tactics'})
+        data = response.json()
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0]['title'], "Medium Tactics Puzzle")
+
+    def test_puzzle_detail_api_excludes_solution(self):
+        """Detail API returns details for a single puzzle without solution."""
+        url = reverse(
+            'puzzle_detail_api',
+            kwargs={'puzzle_id': self.puzzle_easy.id}
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['id'], self.puzzle_easy.id)
+        self.assertEqual(data['title'], "Easy Mate in One")
+        self.assertNotIn('solution', data)
+
+    def test_puzzle_solution_api_returns_solution(self):
+        """The puzzle solution API returns the correct solution array."""
+        url = reverse(
+            'puzzle_solution_api',
+            kwargs={'puzzle_id': self.puzzle_easy.id}
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['solution'], ["e2e4"])
+
+    def test_daily_puzzle_api_excludes_solution(self):
+        """The daily puzzle API endpoint now excludes solutions."""
+        from django.utils import timezone
+        # Assign self.puzzle_easy as today's daily puzzle
+        self.puzzle_easy.date = timezone.localdate()
+        self.puzzle_easy.save()
+
+        url = reverse('daily_puzzle')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['id'], self.puzzle_easy.id)
+        self.assertNotIn('solution', data)

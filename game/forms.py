@@ -138,6 +138,8 @@ class ReplyForm(forms.ModelForm):
 
     def clean_content(self):
         content = self.cleaned_data.get("content", "").strip()
+
         if len(content) < 2:
             raise ValidationError("Reply cannot be empty.")
+
         return content

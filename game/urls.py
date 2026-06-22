@@ -44,8 +44,25 @@ urlpatterns = [
     path("lessons/", views.lesson_map_view, name="lessons"),
     path('lessons/<str:lesson_name>/', views.lesson_detail_view, name='lesson_detail'),
     path('lessons/<str:lesson_name>/complete/', views.complete_lesson, name='complete_lesson'),
+    
+    # Opening Trainer
+    path("openings/", views.opening_trainer, name="opening_trainer"),
+    path("openings/<slug:slug>/", views.opening_detail, name="opening_detail"),
+
     path("api/puzzle-stats/", views.puzzle_stats_view, name="puzzle_stats"),
     path("api/puzzles/daily/", views.get_daily_puzzle, name="daily_puzzle"),
+    path("puzzles/", views.puzzles_view, name="puzzles"),
+    path("api/puzzles/", views.puzzles_list_api, name="puzzles_list_api"),
+    path(
+        "api/puzzles/<int:puzzle_id>/",
+        views.puzzle_detail_api,
+        name="puzzle_detail_api"
+    ),
+    path(
+        "api/puzzles/<int:puzzle_id>/solution/",
+        views.puzzle_solution_api,
+        name="puzzle_solution_api"
+    ),
     
     # Badges & Achievements
     path("achievements/", views.achievements_view, name="achievements"),
@@ -61,3 +78,17 @@ urlpatterns = [
 
 from game.urls_history import history_urlpatterns
 urlpatterns += history_urlpatterns
+
+    # Reply actions
+    path(
+        "forum/reply/<int:reply_id>/edit/",
+        views.forum_reply_edit,
+        name="forum_reply_edit",
+    ),
+
+    path(
+        "forum/reply/<int:reply_id>/delete/",
+        views.forum_reply_delete,
+        name="forum_reply_delete",
+    ),
+]

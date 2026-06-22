@@ -125,7 +125,13 @@
           <div class="dropdown-content">
             <a href="/play/"> Dashboard </a>
 
+            <a href="{% url 'opening_trainer' %}">
+                Opening Trainer
+            </a>
+
             <a href="/stats/"> Stats </a>
+
+            <a href="{% url 'puzzles' %}"> Puzzles </a>
 
             <a href="{% url 'leaderboard' %}"> Leaderboard </a>
 
@@ -778,6 +784,7 @@
             <li><a href="{% url 'stats' %}" class="footer-link">Statistics</a></li>
             <li><a href="{% url 'rules' %}" class="footer-link">Rulebook</a></li>
             <li><a href="{% url 'lessons' %}" class="footer-link">Lessons</a></li>
+            <li><a href="{% url 'puzzles' %}" class="footer-link">Puzzles</a></li>
           </ul>
         </div>
 
@@ -1630,7 +1637,6 @@
         if (!isCorrect) { fb.style.color = '#ef4444'; fb.textContent = '✗ Not quite — 2.Nf3 is the key move.'; }
     }
   </script>
-      <script src="{% static 'game/js/dropdown.js' %}"></script>
   <!-- Keyboard Shortcuts Modal -->
 <div
   id="shortcutsModal"
@@ -1780,6 +1786,6 @@
 
 })();
 </script>
-    <script src="{% static 'game/js/dropdown.js' %}"></script>
+  <script src="{% static 'game/js/dropdown.js' %}"></script>
   </body>
 </html>
