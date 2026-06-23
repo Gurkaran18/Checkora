@@ -5,12 +5,18 @@ on:
     - cron: "0 * * * *"
   workflow_dispatch:
 
-permissions:
-  issues: write
-  pull-requests: read
+concurrency:
+  group: issue-assignment-monitor
+  cancel-in-progress: false
+
+permissions: {}
 
 jobs:
   monitor:
+    permissions:
+      issues: write
+      pull-requests: read
+
     runs-on: ubuntu-latest
 
     steps:
@@ -72,11 +78,6 @@ jobs:
                   (Date.now() - assignedAt.getTime()) /
                   (1000 * 60 * 60);
 
-                const lastActivityHours =
-                  (Date.now() -
-                    new Date(issue.updated_at).getTime()) /
-                  (1000 * 60 * 60);
-
                 const assigneeNames = issue.assignees
                   .map(user => user.login)
                   .join(",");
@@ -100,6 +101,20 @@ jobs:
                       "Please open a PR within the next 12 hours"
                     )
                   );
+                
+                const prs =
+                    await github.rest.search.issuesAndPullRequests({
+                        q: `repo:${owner}/${repo} is:pr is:open ${issue.number} in:body`
+                    });
+
+                const hasOpenPr = prs.data.total_count > 0;
+
+                if (hasOpenPr) {
+                    console.log(
+                        `PR found for issue #${issue.number}`
+                    );
+                    continue;
+                }
 
                 if (
                   hoursSinceAssignment >= REMINDER_HOURS &&
@@ -119,25 +134,6 @@ jobs:
                 }
 
                 if (hoursSinceAssignment < HOURS_LIMIT) {
-                  continue;
-                }
-
-                if (lastActivityHours < 12) {
-                  console.log(
-                    `Issue #${issue.number} recently active`
-                  );
-                  continue;
-                }
-
-                const prs =
-                  await github.rest.search.issuesAndPullRequests({
-                    q: `repo:${owner}/${repo} is:pr is:open ${issue.number}`,
-                  });
-
-                if (prs.data.total_count > 0) {
-                  console.log(
-                    `PR found for issue #${issue.number}`
-                  );
                   continue;
                 }
 

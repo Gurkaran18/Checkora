@@ -5,11 +5,12 @@ on:
     types:
       - assigned
 
-permissions:
-  issues: write
+permissions: {}
 
 jobs:
   notify:
+    permissions:
+        issues: write
     runs-on: ubuntu-latest
 
     steps:
@@ -27,15 +28,14 @@ jobs:
               issue_number: issue.number,
               body: `👋 Hi @${assignee},
 
-                Thank you for taking up this issue.
+Thank you for taking up this issue.
 
-                ⏳ Please open a pull request within **36 hours** of assignment to indicate active work.
+⏳ Please open a pull request within **36 hours** of assignment to indicate active work.
 
-                📢 A reminder will be posted after 24 hours if no PR has been opened.
+📢 A reminder will be posted after 24 hours if no PR has been opened.
 
-                ⚠️ If no pull request is opened within 36 hours, the issue may be automatically unassigned and made available for reassignment.
+⚠️ If no pull request is opened within 36 hours, the issue may be automatically unassigned and made available for reassignment.
 
-                If you need additional time, please leave a progress update comment on this issue.
+If you need additional time, please leave a progress update comment on this issue.
 
-                Happy coding! 🚀`
-                            });
+Happy coding! 🚀`
