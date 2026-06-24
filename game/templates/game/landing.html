@@ -1874,12 +1874,14 @@
     <script src="{% static 'game/js/dropdown.js' %}?v=2"></script>
     <script src="{% static 'game/js/theme.js' %}?v=1"></script>
     <script>
-    // Closes any active dropdowns if you click outside of them
-    document.addEventListener('click', function() {
+    // close only when clicking outside each active dropdown
+    document.addEventListener('click', function(e) {
         document.querySelectorAll('.profile-dropdown.active').forEach(function(menu) {
-            menu.classList.remove('active');
+            if (!menu.contains(e.target)) {
+                menu.classList.remove('active');
+            }
         });
     });
-</script>
+    </script>
   </body>
 </html>
