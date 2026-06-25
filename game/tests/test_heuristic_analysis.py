@@ -72,10 +72,16 @@ class HeuristicAnalysisTest(TestCase):
 
     def test_api_backwards_compatibility(self):
         # Ensure API doesn't fail if fen_history is absent
+        from django.contrib.auth.models import User
+        user = User.objects.create_user(username='test_heuristics', password='password123')
+        
         client = Client()
+        client.force_login(user)
         response = client.post(
             reverse('analyze_game'),
             json.dumps({"moves": ["e4", "e5"]}),
             content_type='application/json'
         )
-        self.assertNotEqual(response.status_code, 500)
+        self.assertEqual(response.status_code, 200)
+        response_data = json.loads(response.content)
+        self.assertIn("opening", response_data)

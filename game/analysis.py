@@ -91,17 +91,28 @@ def classify_moves(moves: list[str], fen_history: list[str]) -> dict:
         # Calculate material advantage from the perspective of the player who just moved
         if is_white_turn:
             adv_before = mat_before['white'] - mat_before['black']
-            adv_after = mat_after['white'] - mat_after['black']
+            adv_after_immediate = mat_after['white'] - mat_after['black']
         else:
             adv_before = mat_before['black'] - mat_before['white']
-            adv_after = mat_after['black'] - mat_after['white']
+            adv_after_immediate = mat_after['black'] - mat_after['white']
             
-        diff = adv_after - adv_before
+        diff = adv_after_immediate - adv_before
         
-        # Look ahead 1 or 2 plies to see if material is regained (e.g., a recapture)
+        # To detect if the move was punished, look at the advantage after the opponent's reply (i+2)
+        if i + 2 < len(material_summary):
+            mat_reply = material_summary[i + 2]
+            if is_white_turn:
+                adv_after_reply = mat_reply['white'] - mat_reply['black']
+            else:
+                adv_after_reply = mat_reply['black'] - mat_reply['white']
+            
+            # Use the worst outcome between immediate and after reply
+            diff = min(diff, adv_after_reply - adv_before)
+
+        # Look ahead up to 4 plies to see if material is regained (e.g., a delayed recapture)
         regained = False
         if diff < 0:
-            for lookahead in range(2, 4):
+            for lookahead in range(1, 5):
                 if i + lookahead < len(material_summary):
                     mat_future = material_summary[i + lookahead]
                     if is_white_turn:

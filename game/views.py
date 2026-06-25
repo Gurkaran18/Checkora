@@ -2175,13 +2175,19 @@ def analyze_game_view(request):
         result = data.get('result', 'Unknown')
         reason = data.get('reason', 'Unknown')
 
-        fen_history = data.get('fen_history', [])
+        fen_history = data.get('fen_history')
 
         if not isinstance(moves, list):
             return JsonResponse({'error': 'Moves must be a list'}, status=400)
             
-        if fen_history and not isinstance(fen_history, list):
-            return JsonResponse({'error': 'fen_history must be a list'}, status=400)
+        if fen_history is not None:
+            if not isinstance(fen_history, list):
+                return JsonResponse({'error': 'fen_history must be a list'}, status=400)
+            if len(fen_history) > MAX_ANALYSIS_MOVES + 1:
+                return JsonResponse({'error': f'fen_history list cannot exceed {MAX_ANALYSIS_MOVES + 1} entries'}, status=400)
+            for fen in fen_history:
+                if not isinstance(fen, str) or len(fen) > 100:
+                    return JsonResponse({'error': 'fen_history items must be strings of at most 100 characters'}, status=400)
 
         if len(moves) > MAX_ANALYSIS_MOVES:
             return JsonResponse({'error': f'Moves list cannot exceed {MAX_ANALYSIS_MOVES} entries'}, status=400)

@@ -2642,7 +2642,10 @@
                 let tempChess = new window.Chess();
                 fenHistory.push(tempChess.fen());
                 for (let move of replayMoves) {
-                    tempChess.move(move);
+                    let res = tempChess.move(move);
+                    if (!res) {
+                        break;
+                    }
                     fenHistory.push(tempChess.fen());
                 }
             }
@@ -2706,12 +2709,16 @@
 
         const blunderEl = document.getElementById('resBlunder');
         if (blunderEl) {
+            const blunderLabel = blunderEl.previousElementSibling;
             if (analysisData && analysisData.blunders > 0) {
                 blunderEl.textContent = `${analysisData.blunders} Blunder${analysisData.blunders > 1 ? 's' : ''}`;
+                if (blunderLabel) blunderLabel.textContent = 'Blunder';
             } else if (analysisData && analysisData.mistakes > 0) {
                 blunderEl.textContent = `${analysisData.mistakes} Mistake${analysisData.mistakes > 1 ? 's' : ''}`;
+                if (blunderLabel) blunderLabel.textContent = 'Mistake';
             } else {
                 blunderEl.textContent = 'None';
+                if (blunderLabel) blunderLabel.textContent = 'Blunder';
             }
         }
 
