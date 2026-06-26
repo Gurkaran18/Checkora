@@ -50,17 +50,17 @@
         // Cap maximum particles to prevent performance issues on spam clicks
         if (particles.length > 1000) return;
         
-        const count = options.count || 100;
-        const spread = options.spread || 70;
-        const colors = options.colors || ['#26ccff', '#a25afd', '#ff5e7e', '#88ff5a', '#fcff42', '#ffa62d', '#ff36ff'];
-        const shapes = options.shapes || ['square', 'circle'];
-        const originX = options.origin?.x !== undefined ? options.origin.x : 0.5;
-        const originY = options.origin?.y !== undefined ? options.origin.y : 0.6; // default slightly lower than center
-        const angle = options.angle !== undefined ? options.angle : 90;
-        const velocity = options.startVelocity || 45;
-        const decay = options.decay || 0.9;
-        const gravity = options.gravity || 1;
-        const scalar = options.scalar || 1;
+        const count = options.count ?? 100;
+        const spread = options.spread ?? 70;
+        const colors = options.colors ?? ['#26ccff', '#a25afd', '#ff5e7e', '#88ff5a', '#fcff42', '#ffa62d', '#ff36ff'];
+        const shapes = options.shapes ?? ['square', 'circle'];
+        const originX = options.origin?.x ?? 0.5;
+        const originY = options.origin?.y ?? 0.6; // default slightly lower than center
+        const angle = options.angle ?? 90;
+        const velocity = options.startVelocity ?? 45;
+        const decay = options.decay ?? 0.9;
+        const gravity = options.gravity ?? 1;
+        const scalar = options.scalar ?? 1;
         
         for (let i = 0; i < count; i++) {
             const radAngle = angle * (Math.PI / 180);
@@ -105,7 +105,7 @@
             p.y += p.vy;
             p.rotation += p.rotationSpeed;
 
-            if (p.y > canvas.height) {
+            if (p.y > canvas.height + 100 || p.y < -100 || p.x < -100 || p.x > canvas.width + 100) {
                 particles.splice(i, 1);
                 continue;
             }

@@ -367,6 +367,10 @@
 
 <script>
 function triggerCelebration(btn) {
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        return;
+    }
+
     const card = btn.closest('.achievement-card');
     card.classList.remove('celebrate-effect');
     // Trigger reflow to restart animation
