@@ -31,22 +31,25 @@ document.documentElement.setAttribute(
 );
 
 // 2. DOM-dependent logic runs after content is loaded.
-document.addEventListener("DOMContentLoaded", () => {
-    const toggle = document.getElementById("themeToggle");
+        document.addEventListener("DOMContentLoaded", () => {
+            const toggles = document.querySelectorAll(".theme-toggle");
 
-    const updateToggleState = (theme) => {
-        if (!toggle) {
-            return;
-        }
-
-        toggle.setAttribute("type", "button");
-        toggle.setAttribute("aria-pressed", theme === "light" ? "true" : "false");
-        toggle.setAttribute(
-            "aria-label",
-            theme === "light" ? "Switch to dark mode" : "Switch to light mode"
-        );
-        toggle.textContent = theme === "light" ? "☀️" : "🌙";
-    };
+            const updateToggleState = (theme) => {
+            toggles.forEach((toggle) => {
+                toggle.setAttribute("type", "button");
+                toggle.setAttribute(
+                    "aria-pressed",
+                    theme === "light" ? "true" : "false"
+                );
+                toggle.setAttribute(
+                    "aria-label",
+                    theme === "light"
+                        ? "Switch to dark mode"
+                        : "Switch to light mode"
+                );
+                toggle.textContent = theme === "light" ? "☀️" : "🌙";
+            });
+        };
 
     // Helper to safely trigger toast notifications, dynamically loading
     // toast.js and toast.css on demand if they aren't statically loaded on the page.
@@ -90,8 +93,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
     let transitionTimeout = null;
 
-    if (toggle) {
-        toggle.addEventListener("click", () => {
+    toggles.forEach((toggle) => {
+    toggle.addEventListener("click", () => {
             const currentTheme = document.documentElement.getAttribute("data-theme");
             const newTheme = currentTheme === "light" ? "dark" : "light";
 
@@ -116,4 +119,4 @@ document.addEventListener("DOMContentLoaded", () => {
             }, 300);
         });
     }
-});
+)});
