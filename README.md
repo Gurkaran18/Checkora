@@ -69,6 +69,7 @@ Join our Discord community for updates, support, and games: https://discord.gg/D
 | Material Score Panel | Live material advantage tracking that updates dynamically during gameplay                           |
 | REST API             | Clean JSON endpoints powering a decoupled frontend                                                  |
 | PvP & PvE Modes      | Play against a friend or challenge the AI                                                           |
+| Custom Cursor        | Pick from Default, Glow, Trail, Sparkle, Orbit, or Chess themes — choice persists across visits    |
 
 ---
 

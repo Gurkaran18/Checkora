@@ -156,6 +156,7 @@
             <button type="button" class="dropdown-item cursor-type-option" data-cursor="trail">Trail</button>
             <button type="button" class="dropdown-item cursor-type-option" data-cursor="sparkle">Sparkle</button>
             <button type="button" class="dropdown-item cursor-type-option" data-cursor="orbit">Orbit</button>
+            <button type="button" class="dropdown-item cursor-type-option" data-cursor="chess">Chess</button>
           </div>
         </div>
         {% if user.is_authenticated %}
@@ -1890,81 +1891,141 @@
 </script>
   <div class="cursor"></div>
   <script>
-    const cursor = document.querySelector('.cursor');
-    const cursorDropdown = document.querySelector('.cursor-dropdown');
-    const cursorTrigger = document.getElementById('cursorTypeTrigger');
-    const cursorTypeLabel = document.getElementById('cursorTypeLabel');
-    const cursorOptions = document.querySelectorAll('.cursor-type-option');
-    let activeCursor = 'default';
-    // Only hide it if it's explicitly set to 'default'
-    if (activeCursor === 'default') {
-        cursor.style.display = 'none';
+    // Idempotent init — only run once even if this script is included twice.
+    if (window.__checkoraCursorInited) {
+      // Already initialized on this page; do nothing.
     } else {
-        cursor.style.display = 'block';
-    }
-    let mouseX = 0;
-    let mouseY = 0;
+      window.__checkoraCursorInited = true;
 
-    document.addEventListener('mousemove', e => {
-      mouseX = e.clientX;
-      mouseY = e.clientY;
-    });
+      const cursor = document.querySelector('.cursor');
+      const cursorDropdown = document.querySelector('.cursor-dropdown');
+      const cursorTrigger = document.getElementById('cursorTypeTrigger');
+      const cursorTypeLabel = document.getElementById('cursorTypeLabel');
+      const cursorOptions = document.querySelectorAll('.cursor-type-option');
+      const CURSOR_STORAGE_KEY = 'checkora:cursor-type';
+      const VALID_CURSOR_TYPES = ['default', 'glow', 'trail', 'sparkle', 'orbit', 'chess'];
 
-    function updateCursorPosition() {
-      cursor.style.left = `${mouseX}px`;
-      cursor.style.top = `${mouseY}px`;
-      requestAnimationFrame(updateCursorPosition);
-    }
+      // ── Accessibility / device guards ────────────────────────────────
+      // Respect users who set the OS-level "reduce motion" preference.
+      const prefersReducedMotion = window.matchMedia &&
+        window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      // Skip the custom cursor entirely on touch-only devices.
+      const isTouchDevice = window.matchMedia &&
+        window.matchMedia('(pointer: coarse)').matches;
 
-    updateCursorPosition();
+      let activeCursor = 'default';
+      let mouseX = 0;
+      let mouseY = 0;
+      let rafRunning = false;
 
-    function updateCursorType(type) {
-    activeCursor = type;
-    cursor.className = 'cursor';
-    
-    if (type !== 'default') {
-        cursor.classList.add(type);
-        cursor.style.opacity = '0.98';
-        cursor.style.display = 'block'; // Centralized!
-    } else {
-        cursor.style.opacity = '0';
-        cursor.style.display = 'none';  // Centralized!
-    }
-      cursorTypeLabel.textContent = type.charAt(0).toUpperCase() + type.slice(1);
-      document.body.classList.toggle('hide-native-cursor', type !== 'default');
+      // ── Position update: compositor-only transform ──────────────────
+      // This is the perf fix — writing left/top triggers layout every
+      // frame. Writing transform: translate3d() stays on the compositor
+      // (GPU layer) and gives 60+ FPS.
+      // The leading translate(-50%, -50%) keeps the cursor centered on the
+      // mouse position (preserves the static centering offset from CSS).
+      function updateCursorPosition() {
+        cursor.style.transform =
+          'translate(-50%, -50%) translate3d(' + mouseX + 'px, ' + mouseY + 'px, 0)';
+        if (activeCursor !== 'default') {
+          rafRunning = true;
+          requestAnimationFrame(updateCursorPosition);
+        } else {
+          rafRunning = false;
+        }
+      }
+
+      // mousemove only caches coords — no DOM writes here.
+      document.addEventListener('mousemove', e => {
+        mouseX = e.clientX;
+        mouseY = e.clientY;
+        if (!rafRunning && activeCursor !== 'default') {
+          rafRunning = true;
+          requestAnimationFrame(updateCursorPosition);
+        }
+      }, { passive: true });
+
+      // ── localStorage helpers (safe — won't throw on disabled storage) ─
+      function safeGetStoredType() {
+        try {
+          const v = window.localStorage.getItem(CURSOR_STORAGE_KEY);
+          return VALID_CURSOR_TYPES.indexOf(v) >= 0 ? v : 'default';
+        } catch (e) { return 'default'; }
+      }
+      function safeSetStoredType(type) {
+        try { window.localStorage.setItem(CURSOR_STORAGE_KEY, type); } catch (e) { /* ignore */ }
+      }
+
+      // ── Apply a cursor type ─────────────────────────────────────────
+      function updateCursorType(type, persist) {
+        if (VALID_CURSOR_TYPES.indexOf(type) < 0) type = 'default';
+        // Auto-fallback for reduced-motion users (override non-default picks).
+        if (prefersReducedMotion && type !== 'default') type = 'default';
+
+        activeCursor = type;
+        cursor.className = 'cursor';
+
+        if (type !== 'default') {
+          cursor.classList.add(type);
+          cursor.style.opacity = '0.98';
+          cursor.style.display = 'block';
+        } else {
+          cursor.style.opacity = '0';
+          cursor.style.display = 'none';
+        }
+
+        cursorTypeLabel.textContent =
+          type.charAt(0).toUpperCase() + type.slice(1);
+        document.body.classList.toggle('hide-native-cursor', type !== 'default');
+        cursorOptions.forEach(option => {
+          option.classList.toggle('selected', option.dataset.cursor === type);
+        });
+
+        // Start/stop the rAF loop as needed.
+        if (type !== 'default' && !rafRunning) {
+          rafRunning = true;
+          requestAnimationFrame(updateCursorPosition);
+        }
+
+        if (persist) safeSetStoredType(type);
+      }
+
+      // ── Init ────────────────────────────────────────────────────────
+      if (!isTouchDevice) {
+        const initialType = prefersReducedMotion ? 'default' : safeGetStoredType();
+        updateCursorType(initialType, false);
+      }
+
+      // ── Dropdown wiring ─────────────────────────────────────────────
+      cursorTrigger.addEventListener('click', e => {
+        e.stopPropagation();
+        cursorDropdown.classList.toggle('active');
+        const expanded = cursorDropdown.classList.contains('active');
+        cursorTrigger.setAttribute('aria-expanded', expanded);
+      });
+
       cursorOptions.forEach(option => {
-        option.classList.toggle('selected', option.dataset.cursor === type);
+        option.addEventListener('click', () => {
+          updateCursorType(option.dataset.cursor, true);
+          cursorDropdown.classList.remove('active');
+          cursorTrigger.setAttribute('aria-expanded', 'false');
+        });
       });
-  }
-updateCursorType('default');
-    cursorTrigger.addEventListener('click', e => {
-      e.stopPropagation();
-      cursorDropdown.classList.toggle('active');
-      const expanded = cursorDropdown.classList.contains('active');
-      cursorTrigger.setAttribute('aria-expanded', expanded);
-    });
 
-    cursorOptions.forEach(option => {
-      option.addEventListener('click', () => {
-        updateCursorType(option.dataset.cursor);
-        cursorDropdown.classList.remove('active');
-        cursorTrigger.setAttribute('aria-expanded', 'false');
+      document.addEventListener('click', e => {
+        if (!cursorDropdown.contains(e.target)) {
+          cursorDropdown.classList.remove('active');
+          cursorTrigger.setAttribute('aria-expanded', 'false');
+        }
       });
-    });
 
-    document.addEventListener('click', e => {
-      if (!cursorDropdown.contains(e.target)) {
-        cursorDropdown.classList.remove('active');
-        cursorTrigger.setAttribute('aria-expanded', 'false');
-      }
-    });
-
-    document.addEventListener('keydown', e => {
-      if (e.key === 'Escape') {
-        cursorDropdown.classList.remove('active');
-        cursorTrigger.setAttribute('aria-expanded', 'false');
-      }
-    });
+      document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') {
+          cursorDropdown.classList.remove('active');
+          cursorTrigger.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
   </script>
     <script src="{% static 'game/js/dropdown.js' %}?v=2"></script>
     <script src="{% static 'game/js/theme.js' %}?v=1"></script>

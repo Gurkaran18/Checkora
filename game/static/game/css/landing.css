@@ -370,8 +370,14 @@ body {
     height: 18px;
     border-radius: 50%;
     background: rgba(240, 192, 64, 0.95);
+    /* translate(-50%, -50%) centers the cursor on the mouse position.
+       JS overrides this each frame with a composite
+       translate(-50%, -50%) translate3d(mouseX, mouseY, 0) — the GPU
+       compositor handles both, keeping the cursor centered at 60+ FPS. */
     transform: translate(-50%, -50%);
-    transition: transform 0.12s ease, width 0.2s ease, height 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, opacity 0.12s ease;
+    /* GPU layer hint: avoids re-paint cost when transform is updated per frame. */
+    will-change: transform;
+    transition: width 0.2s ease, height 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, opacity 0.12s ease;
     box-shadow: 0 0 0 0 rgba(240, 192, 64, 0.3);
     opacity: 0.98;
 }
@@ -395,7 +401,9 @@ body {
     height: 16px;
     background: rgba(255, 255, 255, 0.98);
     box-shadow: 0 0 24px rgba(255, 255, 255, 0.85), 0 0 0 6px rgba(240, 192, 64, 0.12);
-    animation: sparklePulse 1s ease-in-out infinite;
+    /* Was "sparklePulse" — the actual keyframe below is "sparkle-Pulse".
+       This typo made the sparkle's pulsing never animate. */
+    animation: sparkle-Pulse 1s ease-in-out infinite;
 }
 
 .cursor.orbit {
@@ -403,6 +411,28 @@ body {
     height: 12px;
     background: rgba(240, 192, 64, 1);
     box-shadow: 0 0 15px rgba(240, 192, 64, 0.4);
+}
+
+/* ── Chess variant: a pawn glyph follows the pointer with a soft glow. ── */
+.cursor.chess {
+    width: 24px;
+    height: 24px;
+    background: transparent;
+    box-shadow: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    line-height: 1;
+    color: #f0c040;
+    text-shadow: 0 0 10px rgba(240, 192, 64, 0.85), 0 0 22px rgba(240, 192, 64, 0.4);
+    user-select: none;
+}
+.cursor.chess::before {
+    content: '♟';
+    /* Slight tilt makes the pawn feel more dynamic. */
+    display: inline-block;
+    transform: rotate(-15deg);
 }
 
 @keyframes cursor-Orbit {
@@ -435,7 +465,10 @@ body {
     border-radius: 50%;
     transform: translate(-50%, -50%);
     background: rgba(240, 192, 64, 0.12);
-    animation: cursorRing 0.8s ease-out infinite;
+    /* Note: was "cursorRing" — the actual defined keyframe is "cursor-Ring"
+       (see below). This naming mismatch caused the trail's expanding ring
+       animation to silently never play. */
+    animation: cursor-Ring 0.8s ease-out infinite;
 }
 
 .cursor.sparkle::before,
