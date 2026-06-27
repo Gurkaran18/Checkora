@@ -279,6 +279,14 @@ class AnalyzeGameRateLimitTest(TestCase):
             self.assertEqual(response.status_code, 200)
             
         self.client.force_login(self.user2)
+        same_ip_response = self.client.post(
+            reverse('analyze_game'),
+            data=json.dumps(payload),
+            content_type='application/json',
+            REMOTE_ADDR='127.0.0.1'
+        )
+        self.assertEqual(same_ip_response.status_code, 429)
+
         response = self.client.post(
             reverse('analyze_game'),
             data=json.dumps(payload),
