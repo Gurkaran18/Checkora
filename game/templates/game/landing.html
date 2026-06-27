@@ -1922,11 +1922,17 @@
       // This is the perf fix — writing left/top triggers layout every
       // frame. Writing transform: translate3d() stays on the compositor
       // (GPU layer) and gives 60+ FPS.
-      // The leading translate(-50%, -50%) keeps the cursor centered on the
-      // mouse position (preserves the static centering offset from CSS).
+      //
+      // The CSS positions the cursor at top:0; left:0 with width/height
+      // matching its size. JS writes translate3d(mouseX, mouseY, 0) to
+      // place the cursor's top-left corner at the mouse position. The
+      // CSS-rendered size then naturally extends down/right from there.
+      // (Earlier versions centered via translate(-50%, -50%) but that
+      //  collided with CSS animations on pseudo-elements.)
+      const CURSOR_OFFSET = 8; // half of base 16px — visually centers on pointer
       function updateCursorPosition() {
         cursor.style.transform =
-          'translate(-50%, -50%) translate3d(' + mouseX + 'px, ' + mouseY + 'px, 0)';
+          'translate3d(' + (mouseX - CURSOR_OFFSET) + 'px, ' + (mouseY - CURSOR_OFFSET) + 'px, 0)';
         if (activeCursor !== 'default') {
           rafRunning = true;
           requestAnimationFrame(updateCursorPosition);

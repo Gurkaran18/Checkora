@@ -374,11 +374,17 @@ body {
     height: 18px;
     border-radius: 50%;
     background: rgba(240, 192, 64, 0.95);
-    /* translate(-50%, -50%) centers the cursor on the mouse position.
-       JS overrides this each frame with a composite
-       translate(-50%, -50%) translate3d(mouseX, mouseY, 0) — the GPU
-       compositor handles both, keeping the cursor centered at 60+ FPS. */
-    transform: translate(-50%, -50%);
+    /* Top-left anchoring (0,0). The JS translate3d() adds the mouse offset
+       on top. We deliberately do NOT use translate(-50%, -50%) here because
+       a transform on the parent would be overwritten by CSS animations on
+       ::before/::after; anchoring with top/left (initial 0,0) and letting
+       JS write the full position is simpler and more robust. */
+    top: 0;
+    left: 0;
+    /* display: none by default — JS sets display: block when a non-default
+       variant is active. This guarantees the cursor is hidden when Default
+       is selected, with no chance of a flash of unstyled cursor on load. */
+    display: none;
     /* GPU layer hint: avoids re-paint cost when transform is updated per frame. */
     will-change: transform;
     transition: width 0.2s ease, height 0.2s ease, background 0.2s ease, box-shadow 0.2s ease, opacity 0.12s ease;
