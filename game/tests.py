@@ -3605,13 +3605,7 @@ class OpeningLookupRateLimitTest(TestCase):
         self.assertEqual(res3.json(), {"error": "Opening lookup rate limit reached. Please try again shortly."})
 
     def test_opening_trainer_rate_limit_authenticated(self):
-        User.objects.create_user(
-            username='testuser_rl',
-            password='Password123!',
-            email='testuser_rl@example.com'
-        )
-        self.client.login(username='testuser_rl', password='Password123!')
-        
+        # First exhaust the anonymous limit (IP based)
         res1 = self.client.get(self.trainer_url)
         self.assertEqual(res1.status_code, 200)
         
@@ -3621,3 +3615,21 @@ class OpeningLookupRateLimitTest(TestCase):
         res3 = self.client.get(self.trainer_url)
         self.assertEqual(res3.status_code, 429)
         self.assertEqual(res3.json(), {"error": "Opening lookup rate limit reached. Please try again shortly."})
+
+        # Now authenticate and verify we get a fresh allowance (User ID based)
+        User.objects.create_user(
+            username='testuser_rl',
+            password='Password123!',
+            email='testuser_rl@example.com'
+        )
+        self.client.login(username='testuser_rl', password='Password123!')
+        
+        res4 = self.client.get(self.trainer_url)
+        self.assertEqual(res4.status_code, 200)
+        
+        res5 = self.client.get(self.trainer_url)
+        self.assertEqual(res5.status_code, 200)
+        
+        res6 = self.client.get(self.trainer_url)
+        self.assertEqual(res6.status_code, 429)
+        self.assertEqual(res6.json(), {"error": "Opening lookup rate limit reached. Please try again shortly."})
