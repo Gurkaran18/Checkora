@@ -1567,8 +1567,14 @@ def rate_limit(window_setting, max_setting, prefix, error_message="Rate limit re
     def decorator(view_func):
         @wraps(view_func)
         def _wrapped_view(request, *args, **kwargs):
-            key_id = request.user.id if request.user.is_authenticated else get_client_ip(request)
-            key_digest = hashlib.sha256(str(key_id).encode('utf-8')).hexdigest()
+            if request.user.is_authenticated:
+                key_id = request.user.id
+            else:
+                key_id = get_client_ip(request)
+            
+            key_digest = hashlib.sha256(
+                str(key_id).encode('utf-8')
+            ).hexdigest()
             cache_key = f"rate_limit:{prefix}:{key_digest}"
             
             window_seconds = getattr(settings, window_setting, 60)
@@ -3616,11 +3622,14 @@ def lesson_map_view(request):
         }
     )
 
+
 @rate_limit(
     window_setting="OPENING_RATE_LIMIT_WINDOW_SECONDS",
     max_setting="OPENING_RATE_LIMIT_MAX_REQUESTS",
     prefix="opening_lookup",
-    error_message="Opening lookup rate limit reached. Please try again shortly."
+    error_message=(
+        "Opening lookup rate limit reached. Please try again shortly."
+    )
 )
 def opening_trainer(request):
     return render(
@@ -3636,7 +3645,9 @@ def opening_trainer(request):
     window_setting="OPENING_RATE_LIMIT_WINDOW_SECONDS",
     max_setting="OPENING_RATE_LIMIT_MAX_REQUESTS",
     prefix="opening_lookup",
-    error_message="Opening lookup rate limit reached. Please try again shortly."
+    error_message=(
+        "Opening lookup rate limit reached. Please try again shortly."
+    )
 )
 def opening_detail(request, slug):
     opening = next(
