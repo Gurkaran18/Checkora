@@ -234,25 +234,28 @@ function parseSAN(san, color) {
     return null;
 }
 
-function applyMoveOnBoard(fromRow, fromCol, toRow, toCol) {
-    const piece = boardState[fromRow][fromCol];
-    boardState[fromRow][fromCol] = "";
-    boardState[toRow][toCol] = piece;
+function applyMoveToBoardState(state, fromRow, fromCol, toRow, toCol) {
+    const piece = state[fromRow][fromCol];
+    state[fromRow][fromCol] = "";
+    state[toRow][toCol] = piece;
 
     // Castling rook movement
     const pieceType = piece.slice(1);
     if (pieceType === "k" && Math.abs(fromCol - toCol) === 2) {
         if (toCol === 6) {
-            const rook = boardState[toRow][7];
-            boardState[toRow][7] = "";
-            boardState[toRow][5] = rook;
+            const rook = state[toRow][7];
+            state[toRow][7] = "";
+            state[toRow][5] = rook;
         } else if (toCol === 2) {
-            const rook = boardState[toRow][0];
-            boardState[toRow][0] = "";
-            boardState[toRow][3] = rook;
+            const rook = state[toRow][0];
+            state[toRow][0] = "";
+            state[toRow][3] = rook;
         }
     }
+}
 
+function applyMoveOnBoard(fromRow, fromCol, toRow, toCol) {
+    applyMoveToBoardState(boardState, fromRow, fromCol, toRow, toCol);
     renderBoard();
 }
 
@@ -452,22 +455,7 @@ function showMoveAt(index) {
         const moveParsed = parseSAN(moveStr, color);
 
         if (moveParsed) {
-            const piece = boardState[moveParsed.fromRow][moveParsed.fromCol];
-            boardState[moveParsed.fromRow][moveParsed.fromCol] = "";
-            boardState[moveParsed.toRow][moveParsed.toCol] = piece;
-
-            const pieceType = piece.slice(1);
-            if (pieceType === "k" && Math.abs(moveParsed.fromCol - moveParsed.toCol) === 2) {
-                if (moveParsed.toCol === 6) {
-                    const rook = boardState[moveParsed.toRow][7];
-                    boardState[moveParsed.toRow][7] = "";
-                    boardState[moveParsed.toRow][5] = rook;
-                } else if (moveParsed.toCol === 2) {
-                    const rook = boardState[moveParsed.toRow][0];
-                    boardState[moveParsed.toRow][0] = "";
-                    boardState[moveParsed.toRow][3] = rook;
-                }
-            }
+            applyMoveToBoardState(boardState, moveParsed.fromRow, moveParsed.fromCol, moveParsed.toRow, moveParsed.toCol);
 
             lastMoveHighlight = {
                 fromRow: moveParsed.fromRow,
