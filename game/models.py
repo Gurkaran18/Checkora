@@ -479,8 +479,58 @@ class GameRecord(models.Model):
         self.full_clean()
         super().save(*args, **kwargs)
 
+    @property
+    def hours_remaining(self):
+        delta = self.expires_at - timezone.now()
+        if delta.total_seconds() <= 0:
+            return 0
+        return int(delta.total_seconds() // 3600)
+
+    @property
+    def is_expired(self):
+        return self.expires_at <= timezone.now()
+
     def __str__(self):
         return f"Game {self.id} ({self.white_label} vs {self.black_label})"
+
+class ActiveGame(models.Model):
+    """Tracks active games for efficient cleanup."""
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["status", "last_active"]),
+        ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
+
+    session_key = models.CharField(
+        max_length=40,
+        unique=True,
+    )
+
+    last_active = models.DateTimeField(
+        auto_now=True,
+        db_index=True,
+    )
+
+    status = models.CharField(
+        max_length=20,
+        default="active",
+        db_index=True,
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    def __str__(self):
+        return f"{self.session_key} ({self.status})"
+
 class Discussion(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -495,17 +545,6 @@ class Discussion(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-
-    @property
-    def hours_remaining(self):
-        delta = self.expires_at - timezone.now()
-        if delta.total_seconds() <= 0:
-            return 0
-        return int(delta.total_seconds() // 3600)
-
-    @property
-    def is_expired(self):
-        return self.expires_at <= timezone.now()
 
     def __str__(self):
         return self.title

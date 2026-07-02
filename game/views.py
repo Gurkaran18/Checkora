@@ -2,6 +2,7 @@
 import logging
 import json
 import time
+from functools import wraps
 import hashlib
 import math
 import io
@@ -94,6 +95,8 @@ from game.services import (
     check_puzzle_achievements,
     generate_badge,
     update_opening_progress,
+    create_or_update_active_game,
+    delete_active_game,
 )
 
 from django.http import FileResponse
@@ -118,6 +121,11 @@ def index(request):
     if 'game' not in request.session:
         game = ChessGame()
         request.session['game'] = game.to_dict()
+        create_or_update_active_game(
+            request,
+            request.session['game']
+        )
+
     return render(request, 'game/board.html')
 
 
@@ -191,7 +199,7 @@ def record_game_result(request, mode, winner, reason, player_color='white', move
     result.full_clean()
     result.save()
 
-    if user:
+    if user and mode == 'ai':
         update_player_rating(
             user,
             winner,
@@ -246,6 +254,10 @@ def make_move(request):
     if success:
         request.session['game'] = game.to_dict()
         request.session.modified = True
+        create_or_update_active_game(
+            request,
+            request.session['game']
+        )
         if game_status == 'checkmate':
             winner = 'black' if game.current_turn == 'white' else 'white'
             game_result = record_game_result(request, game.mode, winner, 'checkmate', game.player_color, moves=game.move_history)            
@@ -380,6 +392,11 @@ def new_game(request):
     request.session.modified = True
     request.session.save()
 
+    create_or_update_active_game(
+        request,
+        request.session['game']
+    )
+
     return JsonResponse({
         'valid': True,
         'board': game.board,
@@ -416,6 +433,11 @@ def resume_game(request):
     game.last_ts = time.time()
     request.session['game'] = game.to_dict()
     request.session.modified = True
+
+    create_or_update_active_game(
+        request,
+        request.session['game']
+    )
 
     return JsonResponse({
         'valid': True,
@@ -482,6 +504,11 @@ def get_state(request):
     request.session['game'] = game.to_dict()
     request.session.modified = True
 
+    create_or_update_active_game(
+        request,
+        request.session['game']
+    )
+
     return JsonResponse({
         'board': game.board,
         'current_turn': game.current_turn,
@@ -530,6 +557,11 @@ def set_pause(request):
     request.session['game'] = game.to_dict()
     request.session.modified = True
 
+    create_or_update_active_game(
+        request,
+        request.session['game']
+    )
+
     return JsonResponse({
         'paused': game.paused,
         'white_time': game.white_time,
@@ -575,6 +607,11 @@ def ai_move(request):
         request.session['game'] = game.to_dict()
         request.session.modified = True
 
+        create_or_update_active_game(
+            request,
+            request.session['game']
+        )
+
         return JsonResponse({
             'valid': True,
             'game_status': game_status,
@@ -595,6 +632,11 @@ def ai_move(request):
     if success:
         request.session['game'] = game.to_dict()
         request.session.modified = True
+
+        create_or_update_active_game(
+            request,
+            request.session['game']
+        )
 
         if game_status == 'checkmate':
             winner = 'black' if game.current_turn == 'white' else 'white'
@@ -665,6 +707,12 @@ def offer_draw(request):
         game.draw_reason = 'agreement'
         request.session['game'] = game.to_dict()
         request.session.modified = True
+
+        create_or_update_active_game(
+            request,
+            request.session['game']
+        )
+
         record_game_result(request, game.mode, 'draw', 'agreement', game.player_color, moves=game.move_history)
         return JsonResponse({
             'success': True,
@@ -693,6 +741,11 @@ def resign_game(request):
     game.game_status = game_status
     request.session['game'] = game.to_dict()
     request.session.modified = True
+
+    create_or_update_active_game(
+        request,
+        request.session['game']
+    )
 
     try:
         game_result = record_game_result(request, game.mode, winner, 'resign', game.player_color, moves=game.move_history)
@@ -1504,6 +1557,46 @@ def increment_counter(key, timeout):
     finally:
         if acquired:
             cache.delete(lock_key)
+
+
+def rate_limit(window_setting, max_setting, prefix, error_message="Rate limit reached. Please try again shortly."):
+    """
+    Reusable rate limit decorator based on cache throttle.
+    Limits requests to max_setting within window_setting seconds per user/IP.
+    """
+    def decorator(view_func):
+        @wraps(view_func)
+        def _wrapped_view(request, *args, **kwargs):
+            if request.user.is_authenticated:
+                key_id = request.user.id
+            else:
+                key_id = get_client_ip(request)
+            
+            key_digest = hashlib.sha256(
+                str(key_id).encode('utf-8')
+            ).hexdigest()
+            cache_key = f"rate_limit:{prefix}:{key_digest}"
+            
+            window_seconds = getattr(settings, window_setting, 60)
+            max_requests = getattr(settings, max_setting, 60)
+            
+            current = increment_counter(cache_key, window_seconds)
+            
+            if current > max_requests:
+                if request.accepts("text/html"):
+                    from django.http import HttpResponse
+                    return HttpResponse(
+                        (
+                            "<h1>429 Too Many Requests</h1>"
+                            f"<p>{error_message}</p>"
+                        ),
+                        status=429
+                    )
+                return JsonResponse({"error": error_message}, status=429)
+                
+            return view_func(request, *args, **kwargs)
+        return _wrapped_view
+    return decorator
 
 
 def login_view(request):
@@ -3538,6 +3631,15 @@ def lesson_map_view(request):
         }
     )
 
+
+@rate_limit(
+    window_setting="OPENING_RATE_LIMIT_WINDOW_SECONDS",
+    max_setting="OPENING_RATE_LIMIT_MAX_REQUESTS",
+    prefix="opening_lookup",
+    error_message=(
+        "Opening lookup rate limit reached. Please try again shortly."
+    )
+)
 def opening_trainer(request):
     return render(
         request,
@@ -3547,7 +3649,15 @@ def opening_trainer(request):
         }
     )
 
-
+@ensure_csrf_cookie
+@rate_limit(
+    window_setting="OPENING_RATE_LIMIT_WINDOW_SECONDS",
+    max_setting="OPENING_RATE_LIMIT_MAX_REQUESTS",
+    prefix="opening_lookup",
+    error_message=(
+        "Opening lookup rate limit reached. Please try again shortly."
+    )
+)
 def opening_detail(request, slug):
     opening = next(
         (
@@ -3588,13 +3698,47 @@ def update_opening_stats(request):
     completed = data.get("completed", False)
     accuracy = data.get("accuracy", 0)
 
-    update_opening_progress(
+    if not opening_name:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Opening name is required",
+            },
+            status=400,
+        )
+
+    valid_openings = {
+        opening["name"]
+        for opening in OPENINGS
+    }
+
+    if opening_name not in valid_openings:
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Invalid opening name",
+            },
+            status=400,
+        )
+
+    if not isinstance(accuracy, (int, float)):
+        return JsonResponse(
+            {
+                "success": False,
+                "error": "Invalid accuracy",
+            },
+            status=400,
+        )
+
+    accuracy = max(0, min(100, accuracy))
+
+    progress, first_completion = update_opening_progress(
         request.user,
         opening_name,
         completed=completed,
     )
 
-    if completed:
+    if completed and first_completion:
         award_xp(request.user, 50)
 
         if accuracy == 100:
@@ -3604,7 +3748,7 @@ def update_opening_stats(request):
         "success": True,
         "accuracy": accuracy,
     })
-    
+
 @login_required
 def achievements_view(request):
     try:
@@ -4085,3 +4229,28 @@ def get_avatar(request):
         "avatar", flat=True
     ).first() or ""
     return JsonResponse({"avatar": avatar})
+
+
+@login_required
+def profile_view(request):
+    """User profile view."""
+    try:
+        pr = request.user.player_rating
+        rating = pr.rating
+        wins = pr.wins
+        losses = pr.losses
+        draws = pr.draws
+    except PlayerRating.DoesNotExist:
+        # Fallback if PlayerRating doesn't exist
+        rating = 1200
+        wins = 0
+        losses = 0
+        draws = 0
+
+    context = {
+        'rating': rating,
+        'wins': wins,
+        'losses': losses,
+        'draws': draws,
+    }
+    return render(request, 'game/profile.html', context)

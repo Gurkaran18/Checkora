@@ -4,7 +4,10 @@ from django.db import transaction
 from django.contrib.auth import get_user_model
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
+from django.utils import timezone
+
 from game.models import (
+    ActiveGame,
     GameResult,
     PuzzleStats,
     Achievement,
@@ -14,6 +17,39 @@ from game.models import (
 from django.db.models import F
 
 User = get_user_model()
+
+def create_or_update_active_game(request, game_state):
+    """Create or update an active game record."""
+
+    if not request.session.session_key:
+        request.session.save()
+    
+    game_status = game_state.get("game_status", "active")
+
+    # Remove tracker entry once the game has finished.
+    if game_status != "active":
+        ActiveGame.objects.filter(
+            session_key=request.session.session_key
+        ).delete()
+        return
+
+    ActiveGame.objects.update_or_create(
+        session_key=request.session.session_key,
+        defaults={
+            "user": request.user if request.user.is_authenticated else None,
+            "status": "active",
+            "last_active": timezone.now(),
+        },
+    )
+
+
+def delete_active_game(request):
+    """Remove the active game record."""
+
+    if request.session.session_key:
+        ActiveGame.objects.filter(
+            session_key=request.session.session_key
+        ).delete()
 
 def cleanup_stale_games():
     """
@@ -28,17 +64,25 @@ def cleanup_stale_games():
     deleted_count = 0
     resigned_count = 0
     
-    # Iterate over all sessions
-    for session in Session.objects.iterator():
+    stale_games = ActiveGame.objects.filter(
+        status="active",
+        last_active__lt=timezone.now() - timezone.timedelta(hours=48),
+    )
+    for active_game in stale_games:
         try:
+            session = Session.objects.get(
+                session_key=active_game.session_key
+            )
             session_data = session.get_decoded()
+        except Session.DoesNotExist:
+            active_game.delete()
+            continue
         except Exception:
             continue
-            
         game_data = session_data.get('game')
         if not game_data or game_data.get('game_status') != 'active':
+            active_game.delete()
             continue
-            
         last_ts = game_data.get('last_ts', 0)
         if last_ts > stale_threshold:
             continue
@@ -51,6 +95,7 @@ def cleanup_stale_games():
                 del session_data['game']
                 session.session_data = Session.objects.encode(session_data)
                 session.save()
+                active_game.delete()
                 deleted_count += 1
             else:
                 # Rule B: Auto-resignation
@@ -84,7 +129,9 @@ def cleanup_stale_games():
                 )
                 result.full_clean()
                 result.save()
-                
+
+                active_game.delete()
+
                 resigned_count += 1
                 
     return deleted_count, resigned_count
@@ -263,45 +310,53 @@ def update_opening_progress(
     if not user:
         return None
 
-    progress, created = OpeningProgress.objects.get_or_create(
-        user=user,
-        opening_name=opening_name,
-    )
+    with transaction.atomic():
+        progress, created = (
+            OpeningProgress.objects
+            .select_for_update()
+            .get_or_create(
+                user=user,
+                opening_name=opening_name,
+            )
+        )
 
-    if created:
-        progress.openings_started = 1
+        if created:
+            progress.openings_started = 1
     
-    if correct_move:
-        progress.correct_moves += 1
+        if correct_move:
+            progress.correct_moves += 1
 
-    if incorrect_move:
-        progress.incorrect_moves += 1
+        if incorrect_move:
+            progress.incorrect_moves += 1
 
-    if checkpoint is not None:
-        progress.last_checkpoint = checkpoint
+        if checkpoint is not None:
+            progress.last_checkpoint = checkpoint
         
-        progress.completion_percentage = min(
-            100,
-            checkpoint
+            progress.completion_percentage = min(
+                100,
+                checkpoint,
+            )
+
+        total_moves = (
+            progress.correct_moves +
+            progress.incorrect_moves
         )
 
-    total_moves = (
-        progress.correct_moves +
-        progress.incorrect_moves
-    )
+        if total_moves > 0:
+            progress.accuracy_percentage = round(
+                (progress.correct_moves / total_moves) * 100,
+                2
+            )
 
-    if total_moves > 0:
-        progress.accuracy_percentage = round(
-            (progress.correct_moves / total_moves) * 100,
-            2
-        )
+        first_completion = False
 
-    if completed:
-        progress.openings_completed += 1
+        if completed and progress.openings_completed == 0:
+            progress.openings_completed = 1
+            first_completion = True
 
-    progress.save()
+        progress.save()
 
-    return progress
+        return progress, first_completion
 
 def generate_badge(user_achievement):
     achievement = user_achievement.achievement
