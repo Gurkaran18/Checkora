@@ -175,18 +175,6 @@
           </div>
         </div>
 
-        <button
-id="theme-toggle"
-class="theme-toggle"
-type="button"
-aria-label="Toggle theme"
-aria-pressed="false"
-
->
-
-🌙 </button>
-
-
         {% if user.is_authenticated %}
         <div class="profile-dropdown">
           <button type="button" class="profile-btn" style="display:flex;align-items:center;gap:4px;">
@@ -934,22 +922,22 @@ aria-pressed="false"
             </li>
             <li class="maintainer-item">
   <span class="footer-meta-text">
-    Owner:
-    <a href="https://github.com/YOUR_USERNAME" target="_blank" rel="noopener noreferrer">
-      @YOUR_USERNAME
-    </a>
+    Core Maintainers:
+    <a href="https://github.com/EDWARD-012">@EDWARD-012</a>
+    &amp;
+    <a href="https://github.com/triemerge">@triemerge</a>
   </span>
 </li>
 
 <li class="maintainer-item">
   <span class="footer-meta-text">
     Contributors:
-    <a href="https://github.com/triemerge" target="_blank" rel="noopener noreferrer">
-      @triemerge
+    <a href="https://github.com/EDWARD-012" target="_blank" rel="noopener noreferrer">
+    @EDWARD-012
     </a>
     &amp;
-    <a href="https://github.com/EDWARD-012" target="_blank" rel="noopener noreferrer">
-      @EDWARD-012
+    <a href="https://github.com/triemerge" target="_blank" rel="noopener noreferrer">
+    @triemerge
     </a>
   </span>
 </li>
@@ -2025,61 +2013,6 @@ updateCursorType('default');
     <script src="{% static 'game/js/landing.js' %}"></script>
 
     </footer>
-      <script>
-    document.addEventListener("DOMContentLoaded", () => {
-    const themeToggle = document.getElementById("theme-toggle");
-    const root = document.documentElement;
-
-    // Load saved theme
-    let savedTheme = null;
-
-  try {
-  savedTheme = localStorage.getItem("theme");
-  } catch (e) {
-  savedTheme = null;
-  }
-
-    if (savedTheme) {
-        root.setAttribute("data-theme", savedTheme);
-    } else {
-        // Use system preference
-        const prefersLight = window.matchMedia("(prefers-color-scheme: light)").matches;
-
-        if (prefersLight) {
-            root.setAttribute("data-theme", "light");
-        }
-    }
-
-    // Update icon
-// Update icon
-function updateIcon() {
-    const isLight = root.getAttribute("data-theme") === "light";
-
-    if (isLight) {
-        themeToggle.textContent = "☀️";
-    } else {
-        themeToggle.textContent = "🌙";
-    }
-
-    themeToggle.setAttribute("aria-pressed", isLight);
-}
-
-
-    updateIcon();
-
-    // Toggle theme
-    themeToggle.addEventListener("click", () => {
-    const currentTheme = root.getAttribute("data-theme");
-
-    const newTheme = currentTheme === "light" ? "dark" : "light";
-
-    root.setAttribute("data-theme", newTheme);
-    localStorage.setItem("theme", newTheme);
-
-    updateIcon();
-});
-});
-</script>
-
+      
   </body>
 </html>
