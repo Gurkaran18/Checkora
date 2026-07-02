@@ -2652,14 +2652,18 @@
         let analysisData = null;
         let fenHistory = [];
         if (window.Chess) {
-            let tempChess = new window.Chess();
-            fenHistory.push(tempChess.fen());
-            for (let move of replayMoves) {
-                let res = tempChess.move(move);
-                if (!res) {
-                    break;
-                }
+            try {
+                let tempChess = new window.Chess();
                 fenHistory.push(tempChess.fen());
+                for (let move of replayMoves) {
+                    let res = tempChess.move(move);
+                    if (!res) {
+                        break;
+                    }
+                    fenHistory.push(tempChess.fen());
+                }
+            } catch (e) {
+                console.error("Error replaying moves for history", e);
             }
         }
         

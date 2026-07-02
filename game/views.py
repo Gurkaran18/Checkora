@@ -2298,6 +2298,9 @@ def _classify_move(is_best, played_mv, best_mv, game_state):
 @require_POST
 def analyze_game_view(request):
     """POST /api/analyze-game/ — engine-powered post-game analysis."""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Unauthorized'}, status=401)
+
     try:
         data = json.loads(request.body)
         if 'moves' not in data:
@@ -2306,18 +2309,14 @@ def analyze_game_view(request):
         result = data.get('result', 'Unknown')
         reason = data.get('reason', 'Unknown')
 
-        if not request.user.is_authenticated:
-            return JsonResponse({'error': 'Unauthorized'}, status=401)
-
         window = getattr(settings, 'ANALYZE_GAME_RATE_WINDOW_SECONDS', 60)
         user_max = getattr(settings, 'ANALYZE_GAME_USER_MAX_REQUESTS', 10)
         ip_max = getattr(settings, 'ANALYZE_GAME_IP_MAX_REQUESTS', 20)
 
-        if request.user.is_authenticated:
-            user_key = get_analyze_rate_user_key(request.user.id)
-            user_count = increment_counter(user_key, timeout=window)
-            if user_count > user_max:
-                return JsonResponse({'error': 'Too many requests'}, status=429)
+        user_key = get_analyze_rate_user_key(request.user.id)
+        user_count = increment_counter(user_key, timeout=window)
+        if user_count > user_max:
+            return JsonResponse({'error': 'Too many requests'}, status=429)
 
         ip_key = get_analyze_rate_ip_key(get_client_ip(request))
 
