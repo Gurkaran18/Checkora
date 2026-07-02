@@ -16,8 +16,8 @@ class ChessPuzzleAdmin(admin.ModelAdmin):
     search_fields = ('title', 'fen')
     list_filter = ('difficulty', 'date')
 
-original_each_context = admin.site.each_context
 
+original_each_context = admin.site.each_context
 
 def custom_each_context(request):
     context = original_each_context(request)
