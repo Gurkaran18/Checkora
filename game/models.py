@@ -651,8 +651,15 @@ class ReplyVote(models.Model):
     class Meta:
         unique_together = ("reply", "user")
 
-    def __str__(self):
-        return f"{self.user.username} voted {self.value} on reply {self.reply.id}"
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return (
+            f"{self.user.username} "
+            f"{self.get_value_display().lower()}d reply {self.reply_id}"
+        )
 
 class UserProfile(models.Model):
     """Stores optional profile data for a user, including their avatar.

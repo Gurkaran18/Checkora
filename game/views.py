@@ -3982,7 +3982,6 @@ def forum_detail(request, discussion_id):
     replies = (
         discussion.replies
         .select_related("user", "reply_to", "reply_to__user")
-        .prefetch_related("votes")
         .annotate(
             upvote_count=Count(
                 "votes",
@@ -4146,12 +4145,13 @@ def forum_reply_delete(request, reply_id):
 def toggle_reply_vote(request, reply_id):
     reply = get_object_or_404(Reply, id=reply_id)
 
-    # Owners may upvote their own reply but cannot downvote it
-    if reply.user == request.user and request.POST.get("vote") == "down":
+    vote_type = request.POST.get("vote")
+
+    if reply.user_id == request.user.id:
         return JsonResponse(
             {
                 "success": False,
-                "error": "You cannot downvote your own reply.",
+                "error": "You cannot vote on your own reply.",
             },
             status=400,
         )
@@ -4161,8 +4161,6 @@ def toggle_reply_vote(request, reply_id):
             {"success": False, "error": "Cannot vote on deleted replies."},
             status=400
         )
-
-    vote_type = request.POST.get("vote")
 
     if vote_type == "up":
         vote_value = ReplyVote.UPVOTE
@@ -4174,26 +4172,34 @@ def toggle_reply_vote(request, reply_id):
             status=400
         )
 
-    vote, created = ReplyVote.objects.get_or_create(
-        reply=reply,
-        user=request.user,
-        defaults={"value": vote_value}
-    )
+    with transaction.atomic():
+        reply = Reply.objects.select_for_update().get(pk=reply.pk)
+        vote = (
+            ReplyVote.objects
+            .select_for_update()
+            .filter(reply=reply, user=request.user)
+            .first()
+        )
 
-    user_vote = vote_value
-
-    if not created:
-        if vote.value == vote_value:
+        if vote is None:
+            ReplyVote.objects.create(
+                reply=reply,
+                user=request.user,
+                value=vote_value,
+            )
+            user_vote = vote_value
+        elif vote.value == vote_value:
             vote.delete()
             user_vote = 0
         else:
             vote.value = vote_value
             vote.save(update_fields=["value", "updated_at"])
+            user_vote = vote_value
 
-    counts = ReplyVote.objects.filter(reply=reply).aggregate(
-        upvotes=Count("id", filter=models.Q(value=ReplyVote.UPVOTE)),
-        downvotes=Count("id", filter=models.Q(value=ReplyVote.DOWNVOTE)),
-    )
+        counts = ReplyVote.objects.filter(reply=reply).aggregate(
+            upvotes=Count("id", filter=models.Q(value=ReplyVote.UPVOTE)),
+            downvotes=Count("id", filter=models.Q(value=ReplyVote.DOWNVOTE)),
+        )
 
     return JsonResponse(
         {

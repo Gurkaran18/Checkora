@@ -1021,75 +1021,8 @@ html {
     gap: 1rem;
 }
 
-/* One column per vote direction */
-.reply-vote-col {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.2rem;
-    min-width: 44px;
-}
-
-.reply-vote-col--disabled {
-    opacity: 0.4;
-}
-
-.reply-vote-label {
-    font-size: 0.62rem;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    text-transform: uppercase;
-    color: var(--text-secondary);
-    white-space: nowrap;
-}
-
-.reply-vote-count {
-    font-size: 0.88rem;
-    font-weight: 700;
-    color: #ffffff;
-}
-
 .upvote-count  { color: #6ddb8b; }
 .downvote-count { color: #e06c75; }
-
-.reply-vote-btn {
-    width: 30px;
-    height: 30px;
-
-    background: transparent;
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 8px;
-
-    color: var(--text-secondary);
-
-    font-family: inherit;
-    font-size: 0.85rem;
-    font-weight: 700;
-
-    cursor: pointer;
-
-    transition:
-        color 0.2s ease,
-        border-color 0.2s ease,
-        background 0.2s ease;
-}
-
-.reply-vote-btn:hover {
-    color: var(--accent-gold);
-    border-color: rgba(240, 192, 64, 0.3);
-    background: rgba(240, 192, 64, 0.06);
-}
-
-.reply-vote-btn.active {
-    color: var(--accent-gold);
-    border-color: rgba(240, 192, 64, 0.4);
-    background: rgba(240, 192, 64, 0.1);
-}
-
-.reply-vote-btn:disabled {
-    cursor: not-allowed;
-    opacity: 0.45;
-}
 
 .forum-reply-body {
     flex: 1;
@@ -1099,18 +1032,5 @@ html {
 @media (max-width: 600px) {
     .forum-reply-main-layout {
         gap: 0.75rem;
-    }
-
-    .reply-vote-box {
-        gap: 0.3rem;
-    }
-
-    .reply-vote-col {
-        min-width: 36px;
-    }
-
-    .reply-vote-btn {
-        width: 28px;
-        height: 28px;
     }
 }
