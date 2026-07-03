@@ -420,11 +420,20 @@
                 throw new Error(`Failed to fetch daily puzzle: ${response.statusText}`);
             }
             currentPuzzle = await response.json();
+            if (currentPuzzle && currentPuzzle.id !== 0) {
+                const solResponse = await fetch(`/api/puzzles/${currentPuzzle.id}/solution/`);
+                if (solResponse.ok) {
+                    const solData = await solResponse.json();
+                    currentPuzzle.solution = solData.solution;
+                } else {
+                    throw new Error(`Failed to fetch puzzle solution: ${solResponse.statusText}`);
+                }
+            }
         } catch (error) {
             console.error("Error fetching daily puzzle:", error);
             // Fallback to a default puzzle in case API fails
             currentPuzzle = {
-                id: 1,
+                id: 0,
                 title: "Default Puzzle",
                 fen: "6k1/5ppp/8/8/8/8/5PPP/6KQ w - - 0 1",
                 solution: ["g2g4"],
@@ -453,9 +462,9 @@
         clearPuzzleHints();
 
         await startNewGame(
-            "pvp",
+            "ai",
             "white",
-            "medium",
+            currentPuzzle.difficulty || "medium",
             currentPuzzle.fen,
             null,
             null,
@@ -776,6 +785,20 @@
             body: JSON.stringify(body)
         })).json();
     }
+    async function withLoading(btn, asyncFn) {
+        if (!btn || btn.classList.contains('is-loading')) {
+            // Already loading (or no button passed) — don't double-fire.
+            return asyncFn ? asyncFn() : undefined;
+        }
+        btn.classList.add('is-loading');
+        btn.disabled = true;
+        try {
+            return await asyncFn();
+        } finally {
+            btn.classList.remove('is-loading');
+            btn.disabled = false;
+        }
+    }
 
     function isAITurn() {
         return gameMode === 'ai' && turn !== playerColor && !gameOver;
@@ -1055,6 +1078,60 @@
         whiteAlertFired = false;
         blackAlertFired = false;
 
+        const urlParams = new URLSearchParams(window.location.search);
+        const puzzleId = urlParams.get('puzzle_id');
+        if (puzzleId) {
+            // Remove the puzzle_id query param from the URL to prevent recursion loop
+            const url = new URL(window.location);
+            url.searchParams.delete('puzzle_id');
+            window.history.replaceState({}, document.title, url.pathname + url.search);
+
+            try {
+                const response = await fetch(`/api/puzzles/${puzzleId}/`);
+                if (response.ok) {
+                    currentPuzzle = await response.json();
+                    const solResponse = await fetch(`/api/puzzles/${puzzleId}/solution/`);
+                    if (solResponse.ok) {
+                        const solData = await solResponse.json();
+                        currentPuzzle.solution = solData.solution;
+                    }
+                    dailyPuzzleMode = true;
+                    document.getElementById("whiteClock").style.display = "none";
+                    document.getElementById("blackClock").style.display = "none";
+                    document.getElementById("streak-counter").style.display = "block";
+                    updateStreakDisplay();
+                    if (restartPuzzleBtn) restartPuzzleBtn.style.display = 'block';
+                    if (hintPuzzleBtn) hintPuzzleBtn.style.display = 'block';
+                    puzzleMoveIndex = 0;
+                    clearPuzzleHints();
+                    await startNewGame(
+                        "ai",
+                        "white",
+                        currentPuzzle.difficulty || "medium",
+                        currentPuzzle.fen,
+                        null,
+                        null,
+                        true
+                    );
+                    currentPuzzleFen = currentPuzzle.fen;
+                    expectedMoveEval = null;
+                    initStockfish();
+                    precalculateExpectedMoveEval();
+                    const streakData = getPuzzleStreak();
+                    updateStreakDisplay();
+                    showStatus(
+                        `${currentPuzzle.title} | 🔥 Current Streak: ${streakData.streak}`,
+                        false
+                    );
+                    welcomeOverlay.classList.remove('active');
+                    gameLayout.style.visibility = 'visible';
+                    return;
+                }
+            } catch (error) {
+                console.error("Error loading puzzle from query params:", error);
+            }
+        }
+
         const data = await get('/api/state/');
 
         if (data.time_limit !== undefined) {
@@ -1181,12 +1258,37 @@
         if (whiteCapturedName) whiteCapturedName.textContent = wName;
         if (blackCapturedName) blackCapturedName.textContent = bName;
 
+        const whiteAvatarEl = document.getElementById('whitePlayerAvatar');
+        const blackAvatarEl = document.getElementById('blackPlayerAvatar');
+        const whiteCapturedAvatarEl = document.getElementById('whiteCapturedAvatar');
+        const blackCapturedAvatarEl = document.getElementById('blackCapturedAvatar');
+
         if (gameMode === 'ai') {
             if (whiteYouTag) whiteYouTag.style.display = (playerColor === 'white') ? 'inline' : 'none';
             if (blackYouTag) blackYouTag.style.display = (playerColor === 'black') ? 'inline' : 'none';
+            if (whiteAvatarEl && window.USER_AVATAR_URL) {
+                whiteAvatarEl.src = window.USER_AVATAR_URL;
+                whiteAvatarEl.style.display = (playerColor === 'white') ? 'inline-block' : 'none';
+                if (whiteCapturedAvatarEl) {
+                    whiteCapturedAvatarEl.src = window.USER_AVATAR_URL;
+                    whiteCapturedAvatarEl.style.display = (playerColor === 'white') ? 'inline-block' : 'none';
+                }
+            }
+            if (blackAvatarEl && window.USER_AVATAR_URL) {
+                blackAvatarEl.src = window.USER_AVATAR_URL;
+                blackAvatarEl.style.display = (playerColor === 'black') ? 'inline-block' : 'none';
+                if (blackCapturedAvatarEl) {
+                    blackCapturedAvatarEl.src = window.USER_AVATAR_URL;
+                    blackCapturedAvatarEl.style.display = (playerColor === 'black') ? 'inline-block' : 'none';
+                }
+            }
         } else {
             if (whiteYouTag) whiteYouTag.style.display = 'none';
             if (blackYouTag) blackYouTag.style.display = 'none';
+            if (whiteAvatarEl) whiteAvatarEl.style.display = 'none';
+            if (blackAvatarEl) blackAvatarEl.style.display = 'none';
+            if (whiteCapturedAvatarEl) whiteCapturedAvatarEl.style.display = 'none';
+            if (blackCapturedAvatarEl) blackCapturedAvatarEl.style.display = 'none';
         }
     }
 
@@ -1602,8 +1704,8 @@
             const data = await post('/api/move/', body);
 
             // Opening Trainer validation
-            if (openingTrainerMode) {
-                const expectedMove =
+            if (typeof openingTrainerMode !== 'undefined' && openingTrainerMode) {
+                    const expectedMove =
                     openingTrainerSteps[currentTrainerStep]?.expected_move;
 
                 const playedMove =
@@ -2605,8 +2707,22 @@
         // 6. Opening Book and Review Highlights
         let analysisData = null;
         try {
+            let fenHistory = [];
+            if (window.Chess) {
+                let tempChess = new window.Chess();
+                fenHistory.push(tempChess.fen());
+                for (let move of replayMoves) {
+                    let res = tempChess.move(move);
+                    if (!res) {
+                        break;
+                    }
+                    fenHistory.push(tempChess.fen());
+                }
+            }
+
             analysisData = await post('/api/analyze-game/', {
                 moves: replayMoves,
+                fen_history: fenHistory,
                 result: resultState,
                 reason: reason
             });
@@ -2632,6 +2748,21 @@
 
             const proEl = document.getElementById('resAnalysisPromotions');
             if (proEl) proEl.textContent = analysisData.promotions || 0;
+
+            const accuracyEl = document.getElementById('resAccuracyScore');
+            if (accuracyEl && analysisData.accuracy !== undefined) {
+                accuracyEl.textContent = `${analysisData.accuracy}%`;
+            }
+
+            const mistakesEl = document.getElementById('resMistakesCount');
+            if (mistakesEl && analysisData.mistakes !== undefined) {
+                mistakesEl.textContent = analysisData.mistakes;
+            }
+
+            const blundersEl = document.getElementById('resBlundersCount');
+            if (blundersEl && analysisData.blunders !== undefined) {
+                blundersEl.textContent = analysisData.blunders;
+            }
         }
 
         const bestMoveEl = document.getElementById('resBestMove');
@@ -2648,8 +2779,19 @@
 
         const blunderEl = document.getElementById('resBlunder');
         if (blunderEl) {
-            blunderEl.textContent = replayMoves.length > 20 ? '1 mistake (Full review)' : 'None';
+            const blunderLabel = blunderEl.previousElementSibling;
+            if (analysisData && analysisData.blunders > 0) {
+                blunderEl.textContent = `${analysisData.blunders} Blunder${analysisData.blunders > 1 ? 's' : ''}`;
+                if (blunderLabel) blunderLabel.textContent = 'Blunder';
+            } else if (analysisData && analysisData.mistakes > 0) {
+                blunderEl.textContent = `${analysisData.mistakes} Mistake${analysisData.mistakes > 1 ? 's' : ''}`;
+                if (blunderLabel) blunderLabel.textContent = 'Mistake';
+            } else {
+                blunderEl.textContent = 'None';
+                if (blunderLabel) blunderLabel.textContent = 'Blunder';
+            }
         }
+
 
         // Delay the overlay and celebration effects by 0.5 seconds
         setTimeout(() => {
@@ -3264,8 +3406,10 @@
         blackAlertFired = false;
 
         gameStartTime = Date.now();
-
-        gameMode = d.mode;
+        
+        if (!isPuzzle) {
+            gameMode = d.mode;
+        }
         playerColor = d.player_color || 'white';
         currentDifficulty = d.difficulty || difficulty;
         if (resignBtn) {
@@ -3284,7 +3428,14 @@
             flipped = false;
         }
 
-        if (modeBadge) modeBadge.textContent = gameMode === 'ai' ? 'VS AI' : 'PVP';
+        if (modeBadge) {
+            if (isPuzzle) {
+                modeBadge.textContent = 'DAILY PUZZLE';
+            } else {
+                modeBadge.textContent =
+                    gameMode === 'ai' ? 'VS AI' : 'PVP';
+                }
+            }
 
         const emotePanel = document.getElementById('emotePanel');
         if (emotePanel) {
@@ -3298,12 +3449,14 @@
         hints = [];
         await loadGame();
         // Apply active state after UI reload
-        updateModeButtonsUI(gameMode);
+        if (!isPuzzle) {
+            updateModeButtonsUI(gameMode);
+        }
         paused = false;
         updatePauseUI();
 
         // Auto-trigger AI if it's their turn
-        if (gameMode === 'ai' && turn !== playerColor) {
+        if (!isPuzzle && gameMode === 'ai' && turn !== playerColor) {
             queueAIMoveIfNeeded();
         }
 
@@ -3767,11 +3920,18 @@
             clearPuzzleHints();
 
             await startNewGame(
-                "pvp",
+                "ai",
                 "white",
-                "medium",
-                currentPuzzle.fen
+                currentPuzzle.difficulty || "medium",
+                currentPuzzle.fen,
+                null,
+                null,
+                true
             );
+            currentPuzzleFen = currentPuzzle.fen;
+            expectedMoveEval = null;
+            initStockfish();
+            precalculateExpectedMoveEval();
 
             showStatus(
                 "Puzzle Restarted",
@@ -3850,20 +4010,56 @@
 
     if (resignBtn) resignBtn.onclick = () => {
         if (!gameOver) {
-            showConfirm("Resign?", "Are you sure you want to resign?", async () => {
-                try {
-                    const result = await post('/api/resign/', {});
-                    if (result.valid) {
-                        if (soundEnabled) { sounds.draw.currentTime = 0; sounds.draw.play().catch(() => { }); }
-                        const loserColor = result.winner === 'white' ? 'black' : 'white';
-                        endGame('resign', loserColor);
-                    } else {
-                        showStatus('Resign failed. Please try again.', true);
-                    }
-                } catch (_) {
-                    showStatus('Resign failed. Please check your connection and try again.', true);
+            if (gameMode === 'pvp') {
+                const modal = document.getElementById('resignModal');
+                if (modal) {
+                    modal.style.display = 'flex';
+                    
+                    const hideModal = () => {
+                        modal.style.display = 'none';
+                        document.getElementById('resignWhite').onclick = null;
+                        document.getElementById('resignBlack').onclick = null;
+                        document.getElementById('resignCancel').onclick = null;
+                    };
+                    
+                    const confirmResign = (side) => {
+                        hideModal();
+                        showConfirm("Resign?", `Are you sure ${side} wants to resign?`, async () => {
+                            try {
+                                const result = await post('/api/resign/', { resigning_player: side });
+                                if (result.valid) {
+                                    if (soundEnabled) { sounds.draw.currentTime = 0; sounds.draw.play().catch(() => { }); }
+                                    const loserColor = result.winner === 'white' ? 'black' : 'white';
+                                    endGame('resign', loserColor);
+                                } else {
+                                    showStatus('Resign failed. Please try again.', true);
+                                }
+                            } catch (_) {
+                                showStatus('Resign failed. Please check your connection and try again.', true);
+                            }
+                        });
+                    };
+                    
+                    document.getElementById('resignWhite').onclick = () => confirmResign('white');
+                    document.getElementById('resignBlack').onclick = () => confirmResign('black');
+                    document.getElementById('resignCancel').onclick = hideModal;
                 }
-            });
+            } else {
+                showConfirm("Resign?", "Are you sure you want to resign?", async () => {
+                    try {
+                        const result = await post('/api/resign/', {});
+                        if (result.valid) {
+                            if (soundEnabled) { sounds.draw.currentTime = 0; sounds.draw.play().catch(() => { }); }
+                            const loserColor = result.winner === 'white' ? 'black' : 'white';
+                            endGame('resign', loserColor);
+                        } else {
+                            showStatus('Resign failed. Please try again.', true);
+                        }
+                    } catch (_) {
+                        showStatus('Resign failed. Please check your connection and try again.', true);
+                    }
+                });
+            }
         }
     };
 
@@ -4366,7 +4562,10 @@
         }
     });
     if (typeof module !== "undefined" && module.exports) {
-        module.exports = { pColor, getSquareLabel, formatTime, getPlayerScore, validateMoveWithStockfish, clearEvaluationCache };
+        module.exports = { 
+            pColor, getSquareLabel, formatTime, getPlayerScore, validateMoveWithStockfish, clearEvaluationCache,
+            onClick, onDragStart, onDrop, showPromoModal, hidePromoModal, onPromoChoice, toggleSquareHighlight, refreshHighlights, highlightCheck, startNewGame
+        };
     } else {
         loadGame();
     }
@@ -4691,3 +4890,112 @@
     });
 
 })();
+// Enable Enter key submission for Game Setup and Lobby configurations.
+document.addEventListener("DOMContentLoaded", function () {
+    const setupInputs = document.querySelectorAll('#player-name-input, .setup-menu input, #config-panel input');
+
+    setupInputs.forEach(input => {
+        input.addEventListener('keydown', function (event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                
+                const startGameBtn = document.querySelector('#start-game-btn') || document.querySelector('.play-btn') || document.querySelector('#play-vs-ai');
+                
+                if (startGameBtn) {
+                    startGameBtn.click();
+                }
+            }
+        });
+    });
+
+    const shareBtn = document.getElementById('shareResultBtn');
+    if (shareBtn) {
+        shareBtn.addEventListener('click', function () {
+            const titleEl = document.getElementById('gameOverTitle');
+            const messageEl = document.getElementById('gameOverMessage');
+            const whiteNameEl = document.getElementById('whiteNameLabel');
+            const blackNameEl = document.getElementById('blackNameLabel');
+            const movesList = document.getElementById('movesList');
+            
+            const title = titleEl ? titleEl.innerText.trim() : '';
+            const message = messageEl ? messageEl.innerText.trim() : '';
+            const whiteName = whiteNameEl ? whiteNameEl.innerText.trim() : '';
+            const blackName = blackNameEl ? blackNameEl.innerText.trim() : '';
+            
+            let moveCount = 0;
+            if (movesList) {
+                moveCount = movesList.querySelectorAll('span:not(.placeholder)').length ||
+                            movesList.innerText.split('\n').filter(x => x.trim()).length;
+            }
+
+            const cardTitle = document.getElementById('cardTitle');
+            const cardMessage = document.getElementById('cardMessage');
+            const cardWhite = document.getElementById('cardWhite');
+            const cardBlack = document.getElementById('cardBlack');
+            const cardMoves = document.getElementById('cardMoves');
+            
+            if(cardTitle) cardTitle.innerText = title;
+            if(cardMessage) cardMessage.innerText = message;
+            if(cardWhite) cardWhite.innerText = whiteName;
+            if(cardBlack) cardBlack.innerText = blackName;
+            if(cardMoves) cardMoves.innerText = moveCount;
+
+            const shareText =
+`♟️ Checkora Chess
+─────────────────
+${title}
+${message}
+
+⚪ ${whiteName} vs ⚫ ${blackName}
+🔢 Moves played: ${moveCount}
+─────────────────
+🎮 Play at: https://checkora.vercel.app`;
+
+            const modal = document.getElementById('shareModal');
+            if (modal) modal.style.display = 'flex';
+
+            const copyTextBtn = document.getElementById('copyTextBtn');
+            if (copyTextBtn) {
+                copyTextBtn.onclick = function () {
+                    navigator.clipboard.writeText(shareText).then(() => {
+                        this.innerText = '✅ Copied!';
+                        setTimeout(() => this.innerText = '📋 Copy Text', 2000);
+                    });
+                };
+            }
+
+            const copyLinkBtn = document.getElementById('copyLinkBtn');
+            if (copyLinkBtn) {
+                copyLinkBtn.onclick = function () {
+                    navigator.clipboard.writeText('https://checkora.vercel.app').then(() => {
+                        this.innerText = '✅ Link Copied!';
+                        setTimeout(() => this.innerText = '🔗 Copy Link', 2000);
+                    });
+                };
+            }
+
+            const whatsappBtn = document.getElementById('whatsappBtn');
+            if (whatsappBtn) {
+                whatsappBtn.onclick = function () {
+                    const encoded = encodeURIComponent(shareText);
+                    window.open(`https://wa.me/?text=${encoded}`, '_blank', 'noopener,noreferrer');
+                };
+            }
+
+            const twitterBtn = document.getElementById('twitterBtn');
+            if (twitterBtn) {
+                twitterBtn.onclick = function () {
+                    const encoded = encodeURIComponent(shareText);
+                    window.open(`https://twitter.com/intent/tweet?text=${encoded}`, '_blank', 'noopener,noreferrer');
+                };
+            }
+
+            const closeShareBtn = document.getElementById('closeShareBtn');
+            if (closeShareBtn && modal) {
+                closeShareBtn.onclick = function () {
+                    modal.style.display = 'none';
+                };
+            }
+        });
+    }
+});

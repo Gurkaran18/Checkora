@@ -1,12 +1,16 @@
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
+    
     const dropdown = document.querySelector('.profile-dropdown');
     if (!dropdown) return;
 
     const btn = dropdown.querySelector('.profile-btn');
     const content = dropdown.querySelector('.dropdown-content');
+    function closeDropdown() {
+        dropdown.classList.remove('active');
+    }
 
     if (btn && content) {
-        btn.addEventListener('click', function(e) {
+        btn.addEventListener('click', function (e) {
             e.stopPropagation();
             dropdown.classList.toggle('active');
         });
@@ -14,14 +18,14 @@ document.addEventListener('DOMContentLoaded', function() {
         // Close dropdown when clicking outside
         document.addEventListener('click', function(e) {
             if (!dropdown.contains(e.target)) {
-                dropdown.classList.remove('active');
+                closeDropdown();
             }
         });
 
         // Close on Escape key
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
-                dropdown.classList.remove('active');
+                closeDropdown();
             }
         });
 
@@ -30,9 +34,14 @@ document.addEventListener('DOMContentLoaded', function() {
             // Use setTimeout to allow focus to move to the new element
             setTimeout(() => {
                 if (!dropdown.contains(document.activeElement)) {
-                    dropdown.classList.remove('active');
+                    closeDropdown();
                 }
             }, 10);
         });
+        window.addEventListener(
+        'scroll',
+        closeDropdown,
+        { passive: true }
+    );
     }
 });
