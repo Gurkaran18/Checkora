@@ -2321,7 +2321,6 @@ def _classify_move(is_best, played_mv, best_mv, game_state):
     elif diff >= 1:
         return 'Mistake'
     return 'Inaccuracy'
-    return 'Inaccuracy'
 
 @require_POST
 def analyze_game_view(request):
