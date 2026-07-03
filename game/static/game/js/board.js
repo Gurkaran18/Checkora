@@ -28,6 +28,60 @@
         'k': 'King'
     };
 
+    /* ==========================================================
+    SESSION SCORE TRACKER (W/L/D — persists via sessionStorage,
+    resets automatically when the browser session ends)
+    ========================================================== */
+    const SESSION_STATS_KEY = 'checkoraSessionStats';
+
+    function loadSessionStats() {
+        try {
+            const raw = sessionStorage.getItem(SESSION_STATS_KEY);
+            if (!raw) return { wins: 0, losses: 0, draws: 0 };
+            const parsed = JSON.parse(raw);
+            return {
+                wins: Number(parsed.wins) || 0,
+                losses: Number(parsed.losses) || 0,
+                draws: Number(parsed.draws) || 0
+            };
+        } catch (e) {
+            return { wins: 0, losses: 0, draws: 0 };
+        }
+    }
+
+    function saveSessionStats(stats) {
+        try {
+            sessionStorage.setItem(SESSION_STATS_KEY, JSON.stringify(stats));
+        } catch (e) {
+            // sessionStorage unavailable (e.g. private browsing) — fail silently
+        }
+    }
+
+    function renderSessionTracker(stats) {
+        const winsEl = document.getElementById('sessionWins');
+        const lossesEl = document.getElementById('sessionLosses');
+        const drawsEl = document.getElementById('sessionDraws');
+        if (winsEl) winsEl.textContent = stats.wins;
+        if (lossesEl) lossesEl.textContent = stats.losses;
+        if (drawsEl) drawsEl.textContent = stats.draws;
+    }
+
+    function updateSessionTracker() {
+        renderSessionTracker(loadSessionStats());
+    }
+
+    // outcome: 'victory' | 'defeat' | 'draw'
+    function recordGameResult(outcome) {
+        const stats = loadSessionStats();
+        if (outcome === 'victory') stats.wins += 1;
+        else if (outcome === 'defeat') stats.losses += 1;
+        else if (outcome === 'draw') stats.draws += 1;
+        else return;
+
+        saveSessionStats(stats);
+        renderSessionTracker(stats);
+    }
+
     let board = [];
     let turn = 'white';
     let selected = null;
@@ -2219,6 +2273,8 @@
 
         let isCelebration = (resultState === 'victory');
 
+        // Update the session W/L/D tracker for this completed game
+        recordGameResult(resultState);
 
         // Play distinct game over sound
         playGameOverSound(reason, resultState);
@@ -4612,6 +4668,9 @@
 
     // Call picker init immediately
     initTimeControlPicker();
+
+    // Render any W/L/D counts already stored for this browser session
+    updateSessionTracker();
     // Resume game by clicking the paused board overlay
     boardEl.addEventListener('click', async () => {
         if (!paused) return;
