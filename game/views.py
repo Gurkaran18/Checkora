@@ -1,6 +1,7 @@
 """Game views for the Checkora chess platform."""
 import logging
 import json
+import signal
 import time
 from functools import wraps
 import hashlib
@@ -2331,8 +2332,15 @@ def analyze_game_view(request):
         for m in moves:
             if not isinstance(m, str) or len(m) > MAX_MOVE_LENGTH:
                 return JsonResponse({'error': f'Move must be a string of at most {MAX_MOVE_LENGTH} characters'}, status=400)
+        
+        # Add timeout warning to response - analysis will be aborted after 10 seconds
+        ANALYSIS_TIMEOUT_SECONDS = getattr(settings, 'ANALYSIS_TIMEOUT_SECONDS', 10)
         summary = build_summary(moves, result, reason, fen_history=fen_history)
-        return JsonResponse(summary)
+        summary['analysis_timeout_seconds'] = ANALYSIS_TIMEOUT_SECONDS
+        
+        response = JsonResponse(summary)
+        response['X-Analysis-Timeout'] = str(ANALYSIS_TIMEOUT_SECONDS)
+        return response
     except Exception as e:
         logger.error('Failed to analyze game: %s', e)
         return JsonResponse({'error': 'Failed to analyze game'}, status=400)

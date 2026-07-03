@@ -368,7 +368,8 @@ DP cache is intentionally excluded to save cookie space."""
                 stderr=subprocess.PIPE,
                 text=True,
             )
-            stdout, _ = proc.communicate(input=command, timeout=5)
+            timeout_secs = getattr(self, "_analysis_timeout", self.ANALYSIS_TIMEOUT_SECONDS)
+            stdout, _ = proc.communicate(input=command, timeout=timeout_secs)
             return stdout.strip()
         except (subprocess.TimeoutExpired, OSError):
             return None
@@ -997,6 +998,7 @@ DP cache is intentionally excluded to save cookie space."""
     AI_SEARCH_DEPTH_CPP = 4  # C++ is much faster, can search deeper
     AI_SEARCH_DEPTH_PYTHON = 3  # Python engine needs conservative depth
 
+    ANALYSIS_TIMEOUT_SECONDS = 10  # Max seconds for engine analysis before returning best-so-far move
     def get_ai_move(self, depth=None):
         """Return the best move for the current position.
 
