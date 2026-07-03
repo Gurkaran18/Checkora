@@ -522,8 +522,9 @@ def get_opening_reply(name, move_index, played_moves):
     moves = get_opening_line(name)
     if move_index >= len(moves):
         return None
-    # verify every move played so far matches the book line
-    if played_moves != moves[:move_index]:
+    # normalize book moves to tuples for comparison against played_moves
+    expected = [tuple(m) for m in moves[:move_index]]
+    if list(played_moves) != expected:
         return None
     return moves[move_index]
 
