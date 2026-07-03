@@ -46,6 +46,34 @@
             color: #94a3b8;
             vertical-align: middle;
         }
+        /* ── SAN Quick Move Input styles ── */
+        .san-input-container {
+            margin-top: 15px;
+            display: flex;
+            gap: 8px;
+        }
+        .san-move-input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #444;
+            background: #1a1a2e;
+            color: #fff;
+            font-size: 0.9rem;
+        }
+        .san-move-btn {
+            padding: 10px 15px;
+        }
+        .san-move-error {
+            color: #ff6b6b;
+            font-size: 0.8rem;
+            display: none;
+            margin-top: 5px;
+            padding: 5px;
+            background: rgba(255, 107, 107, 0.1);
+            border-radius: 4px;
+            border: 1px solid rgba(255, 107, 107, 0.3);
+        }
     </style>
 
     <!-- Vercel Web Analytics -->
@@ -512,11 +540,11 @@
                </div>
                 
                 <!-- Quick Move Input (SAN) -->
-                <div class="san-input-container" style="margin-top: 15px; display: flex; gap: 8px;">
-                    <input type="text" id="sanMoveInput" placeholder="Move (e.g. e4, Nf3, O-O)" aria-label="Enter move notation" style="flex: 1; padding: 10px; border-radius: 5px; border: 1px solid #444; background: #1a1a2e; color: #fff; font-size: 0.9rem;" autocomplete="off">
-                    <button type="button" id="sanMoveBtn" class="btn btn-gold" style="padding: 10px 15px;">Move</button>
+                <div class="san-input-container">
+                    <input type="text" id="sanMoveInput" class="san-move-input" placeholder="Move (e.g. e4, Nf3, O-O)" aria-label="Enter move notation" autocomplete="off">
+                    <button type="button" id="sanMoveBtn" class="btn btn-gold san-move-btn">Move</button>
                 </div>
-                <div id="sanMoveError" role="alert" style="color: #ff6b6b; font-size: 0.8rem; display: none; margin-top: 5px; padding: 5px; background: rgba(255, 107, 107, 0.1); border-radius: 4px; border: 1px solid rgba(255, 107, 107, 0.3);">Invalid notation</div>
+                <div id="sanMoveError" class="san-move-error" role="alert">Invalid notation</div>
             </div>
         </div>
         
