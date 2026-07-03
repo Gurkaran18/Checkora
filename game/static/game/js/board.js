@@ -4158,15 +4158,24 @@
             if (!window.Chess) throw new Error("Chess engine not loaded");
             const chess = new window.Chess(data.fen);
             
-            // Minimal normalization
+            // Minimal normalization: fix casing so chess.js can parse user input
+            // without corrupting check/checkmate suffixes (+/#) or promotion (=Q)
             if (/^[0oO]-[0oO]-[0oO]$/i.test(san)) {
                 san = 'O-O-O';
             } else if (/^[0oO]-[0oO]$/i.test(san)) {
                 san = 'O-O';
             } else if (/^[nbrqk]/i.test(san)) {
-                san = san.charAt(0).toUpperCase() + san.slice(1);
+                // Piece moves: uppercase first letter, lowercase body, preserve =Q/=R/=B/=N suffix and +/#
+                const promoMatch = san.match(/=([qrbnQRBN])([+#]?)$/);
+                const suffix = promoMatch ? `=${promoMatch[1].toUpperCase()}${promoMatch[2]}` : san.match(/[+#]$/) ? san.slice(-1) : '';
+                const body = san.replace(/[+#]$/, '').replace(/=([qrbnQRBN])$/, '');
+                san = body.charAt(0).toUpperCase() + body.slice(1).toLowerCase() + suffix;
             } else if (/^[a-h]/i.test(san)) {
-                san = san.charAt(0).toLowerCase() + san.slice(1);
+                // Pawn moves: lowercase file letter, preserve promotion suffix and +/#
+                const promoMatch = san.match(/=([qrbnQRBN])([+#]?)$/);
+                const suffix = promoMatch ? `=${promoMatch[1].toUpperCase()}${promoMatch[2]}` : san.match(/[+#]$/) ? san.slice(-1) : '';
+                const body = san.replace(/[+#]$/, '').replace(/=([qrbnQRBN])$/, '');
+                san = body.charAt(0).toLowerCase() + body.slice(1) + suffix;
             }
             
             const moveObj = chess.move(san);

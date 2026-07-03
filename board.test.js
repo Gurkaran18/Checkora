@@ -556,16 +556,22 @@ describe("SAN Quick Move Input", () => {
     const flipBtn = document.getElementById("flipBtn");
     // Mock the click on flipBtn
     flipBtn.click = jest.fn();
-    
-    input.focus();
-    // Simulate global keydown listener which uses document.activeElement check
-    // Wait, the test environment doesn't perfectly simulate activeElement in all cases unless attached.
-    // Instead we can dispatch the event on document, but mock activeElement.
-    Object.defineProperty(document, 'activeElement', { value: input, writable: true });
-    
-    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' }));
-    
-    expect(flipBtn.click).not.toHaveBeenCalled();
+
+    // Save the original activeElement descriptor and restore it after the test
+    const originalDescriptor = Object.getOwnPropertyDescriptor(document, 'activeElement');
+    try {
+      Object.defineProperty(document, 'activeElement', { value: input, configurable: true, writable: true });
+      
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'f' }));
+      
+      expect(flipBtn.click).not.toHaveBeenCalled();
+    } finally {
+      if (originalDescriptor) {
+        Object.defineProperty(document, 'activeElement', originalDescriptor);
+      } else {
+        delete document.activeElement;
+      }
+    }
   });
 
   it('backend move rejection retains input and shows error', async () => {
@@ -656,6 +662,40 @@ describe("SAN Quick Move Input", () => {
     expect(body.to_row).toBe(0);
     expect(body.to_col).toBe(4);
     expect(body.promotion_piece).toBe('q');
+  });
+
+  it('fully-uppercase piece SAN (NF3) is normalized and executed', async () => {
+    const input = document.getElementById("sanMoveInput");
+    input.value = "NF3";
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await flushPromises();
+    
+    // Should normalize to Nf3 and succeed
+    expect(input.value).toBe('');
+    const moveReqs = global.fetch.mock.calls.filter(c => c[0] && c[0].includes('/api/move/'));
+    const body = JSON.parse(moveReqs[moveReqs.length - 1][1].body);
+    // g1 -> f3: fr=7, fc=6, tr=5, tc=5
+    expect(body.from_row).toBe(7);
+    expect(body.from_col).toBe(6);
+    expect(body.to_row).toBe(5);
+    expect(body.to_col).toBe(5);
+  });
+
+  it('fully-uppercase pawn SAN (E4) is normalized and executed', async () => {
+    const input = document.getElementById("sanMoveInput");
+    input.value = "E4";
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    await flushPromises();
+    
+    // Should normalize to e4 and succeed
+    expect(input.value).toBe('');
+    const moveReqs = global.fetch.mock.calls.filter(c => c[0] && c[0].includes('/api/move/'));
+    const body = JSON.parse(moveReqs[moveReqs.length - 1][1].body);
+    // e2 -> e4: fr=6, fc=4, tr=4, tc=4
+    expect(body.from_row).toBe(6);
+    expect(body.from_col).toBe(4);
+    expect(body.to_row).toBe(4);
+    expect(body.to_col).toBe(4);
   });
 });
 
