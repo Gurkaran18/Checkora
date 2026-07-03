@@ -622,7 +622,44 @@ class DiscussionBookmark(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
+    
+class ReplyVote(models.Model):
+    UPVOTE = 1
+    DOWNVOTE = -1
 
+    VOTE_CHOICES = (
+        (UPVOTE, "Upvote"),
+        (DOWNVOTE, "Downvote"),
+    )
+
+    reply = models.ForeignKey(
+        Reply,
+        on_delete=models.CASCADE,
+        related_name="votes"
+    )
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="reply_votes"
+    )
+
+    value = models.SmallIntegerField(choices=VOTE_CHOICES)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("reply", "user")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return (
+            f"{self.user.username} "
+            f"{self.get_value_display().lower()}d reply {self.reply_id}"
+        )
 
 class UserProfile(models.Model):
     """Stores optional profile data for a user, including their avatar.
