@@ -734,7 +734,16 @@ def resign_game(request):
     if game.game_status != 'active':
         return JsonResponse({'valid': False, 'message': 'Game is already over.'}, status=400)
 
-    resigning_player = game.player_color if game.mode == 'ai' else game.current_turn
+    import json
+    try:
+        data = json.loads(request.body)
+        resigning_player = data.get('resigning_player')
+    except (json.JSONDecodeError, AttributeError, ValueError):
+        resigning_player = None
+
+    if resigning_player not in ['white', 'black']:
+        resigning_player = game.player_color if game.mode == 'ai' else game.current_turn
+
     winner = 'black' if resigning_player == 'white' else 'white'
     game_status = 'resignation'
 

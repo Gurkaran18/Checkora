@@ -849,6 +849,28 @@
         </div>
     </div>
 
+    <!-- ========== RESIGN SELECTION MODAL ========== -->
+    <div class="promo-overlay" id="resignModal" style="display: none;">
+        <div class="promo-dialog">
+            <div class="promo-title" style="font-size: 1.4rem; color: #ff6b6b; margin-bottom: 10px;">Who is resigning?
+            </div>
+            <p style="color: #aaa; margin-bottom: 25px; font-size: 0.9rem;">Select the player who is resigning.</p>
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <button class="btn" id="resignWhite"
+                    style="padding: 12px; background: #fff; color: #000; font-size: 1rem; border-radius: 6px;">
+                    White
+                </button>
+                <button class="btn" id="resignBlack"
+                    style="padding: 12px; background: #000; color: #fff; font-size: 1rem; border-radius: 6px; border: 1px solid #555;">
+                    Black
+                </button>
+                <button class="btn btn-secondary" id="resignCancel" style="padding: 12px; font-size: 1rem;">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- RULEBOOK MODAL -->
     <div id="rulebookModal"
         style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:10001; align-items:center; justify-content:center;">

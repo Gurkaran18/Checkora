@@ -3954,20 +3954,56 @@
 
     if (resignBtn) resignBtn.onclick = () => {
         if (!gameOver) {
-            showConfirm("Resign?", "Are you sure you want to resign?", async () => {
-                try {
-                    const result = await post('/api/resign/', {});
-                    if (result.valid) {
-                        if (soundEnabled) { sounds.draw.currentTime = 0; sounds.draw.play().catch(() => { }); }
-                        const loserColor = result.winner === 'white' ? 'black' : 'white';
-                        endGame('resign', loserColor);
-                    } else {
-                        showStatus('Resign failed. Please try again.', true);
-                    }
-                } catch (_) {
-                    showStatus('Resign failed. Please check your connection and try again.', true);
+            if (gameMode === 'pvp') {
+                const modal = document.getElementById('resignModal');
+                if (modal) {
+                    modal.style.display = 'flex';
+                    
+                    const hideModal = () => {
+                        modal.style.display = 'none';
+                        document.getElementById('resignWhite').onclick = null;
+                        document.getElementById('resignBlack').onclick = null;
+                        document.getElementById('resignCancel').onclick = null;
+                    };
+                    
+                    const confirmResign = (side) => {
+                        hideModal();
+                        showConfirm("Resign?", `Are you sure ${side} wants to resign?`, async () => {
+                            try {
+                                const result = await post('/api/resign/', { resigning_player: side });
+                                if (result.valid) {
+                                    if (soundEnabled) { sounds.draw.currentTime = 0; sounds.draw.play().catch(() => { }); }
+                                    const loserColor = result.winner === 'white' ? 'black' : 'white';
+                                    endGame('resign', loserColor);
+                                } else {
+                                    showStatus('Resign failed. Please try again.', true);
+                                }
+                            } catch (_) {
+                                showStatus('Resign failed. Please check your connection and try again.', true);
+                            }
+                        });
+                    };
+                    
+                    document.getElementById('resignWhite').onclick = () => confirmResign('white');
+                    document.getElementById('resignBlack').onclick = () => confirmResign('black');
+                    document.getElementById('resignCancel').onclick = hideModal;
                 }
-            });
+            } else {
+                showConfirm("Resign?", "Are you sure you want to resign?", async () => {
+                    try {
+                        const result = await post('/api/resign/', {});
+                        if (result.valid) {
+                            if (soundEnabled) { sounds.draw.currentTime = 0; sounds.draw.play().catch(() => { }); }
+                            const loserColor = result.winner === 'white' ? 'black' : 'white';
+                            endGame('resign', loserColor);
+                        } else {
+                            showStatus('Resign failed. Please try again.', true);
+                        }
+                    } catch (_) {
+                        showStatus('Resign failed. Please check your connection and try again.', true);
+                    }
+                });
+            }
         }
     };
 
