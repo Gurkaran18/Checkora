@@ -4205,15 +4205,50 @@ def forum_detail(request, discussion_id):
 
 @login_required
 def forum_new(request):
+    if request.method == "POST" and not request.user.is_staff:
+        window_start = timezone.now() - timedelta(
+            seconds=settings.FORUM_DISCUSSION_RATE_WINDOW_SECONDS
+        )
+
+        recent_discussions = Discussion.objects.filter(
+            user=request.user,
+            created_at__gte=window_start
+        ).count()
+
+        if recent_discussions >= settings.FORUM_DISCUSSION_MAX_REQUESTS:
+            logger.warning(
+                "Forum discussion rate limit exceeded: "
+                "user=%s id=%s ip=%s",
+                request.user.username,
+                request.user.id,
+                request.META.get("REMOTE_ADDR"),
+            )
+
+            messages.error(
+                request,
+                "You are creating discussions too quickly. "
+                "Please wait before trying again."
+            )
+
+            return redirect("forum")
+
     if request.method == "POST":
         form = DiscussionForm(request.POST)
+
         if form.is_valid():
             discussion = form.save(commit=False)
             discussion.user = request.user
             discussion.save()
 
-            messages.success(request, "Discussion created successfully.")
-            return redirect("forum_detail", discussion_id=discussion.id)
+            messages.success(
+                request,
+                "Discussion created successfully."
+            )
+
+            return redirect(
+                "forum_detail",
+                discussion_id=discussion.id
+            )
     else:
         form = DiscussionForm()
 
@@ -4228,7 +4263,42 @@ def forum_new(request):
 @login_required
 @require_POST
 def forum_reply(request, discussion_id):
-    discussion = get_object_or_404(Discussion, id=discussion_id)
+    discussion = get_object_or_404(
+        Discussion,
+        id=discussion_id
+    )
+
+    if not request.user.is_staff:
+        window_start = timezone.now() - timedelta(
+            seconds=settings.FORUM_REPLY_RATE_WINDOW_SECONDS
+        )
+
+        recent_replies = Reply.objects.filter(
+            user=request.user,
+            created_at__gte=window_start
+        ).count()
+
+        if recent_replies >= settings.FORUM_REPLY_MAX_REQUESTS:
+            logger.warning(
+                "Forum reply rate limit exceeded: "
+                "user=%s id=%s ip=%s discussion=%s",
+                request.user.username,
+                request.user.id,
+                request.META.get("REMOTE_ADDR"),
+                discussion.id,
+            )
+
+            messages.error(
+                request,
+                "You are replying too quickly. "
+                "Please wait before posting again."
+            )
+
+            return redirect(
+                "forum_detail",
+                discussion_id=discussion.id
+            )
+
     form = ReplyForm(request.POST)
 
     reply_to_id = request.POST.get("reply_to")
@@ -4240,9 +4310,17 @@ def forum_reply(request, discussion_id):
             discussion=discussion,
             is_deleted=False
         ).first()
+
         if parent_reply is None:
-            messages.error(request, "selected parent reply is unavailable.")
-            return redirect("forum_detail", discussion_id=discussion.id)
+            messages.error(
+                request,
+                "Selected parent reply is unavailable."
+            )
+
+            return redirect(
+                "forum_detail",
+                discussion_id=discussion.id
+            )
 
     if form.is_valid():
         reply = form.save(commit=False)
@@ -4251,11 +4329,20 @@ def forum_reply(request, discussion_id):
         reply.reply_to = parent_reply
         reply.save()
 
-        messages.success(request, "Reply posted successfully.")
+        messages.success(
+            request,
+            "Reply posted successfully."
+        )
     else:
-        messages.error(request, "Reply could not be posted.")
+        messages.error(
+            request,
+            "Reply could not be posted."
+        )
 
-    return redirect("forum_detail", discussion_id=discussion.id)
+    return redirect(
+        "forum_detail",
+        discussion_id=discussion.id
+    )
 
 @login_required
 @require_POST
