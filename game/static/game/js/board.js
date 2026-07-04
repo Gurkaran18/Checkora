@@ -1510,8 +1510,7 @@
                 return;
             case 'Escape':
                 e.preventDefault();
-                document.querySelectorAll('.square.selected')
-                    .forEach(s => s.classList.remove('selected'));
+                deselect();
                 return;
             default:
                 return;
