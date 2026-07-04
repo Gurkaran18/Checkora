@@ -2443,14 +2443,11 @@
             const spans = row.querySelectorAll('.move-white, .move-black');
             spans.forEach(span => {
                 const rawMove = span.textContent?.replace(/\s+/g, '')?.trim();
+                const move = rawMove?.replace(/[+#]/g, '');
+
                 if (rawMove && rawMove !== '...') {
                     rawAnalysisMoves.push(rawMove);
                 }
-                
-                const move = span.textContent
-                    ?.replace(/[+#]/g, '')
-                    ?.replace(/\s+/g, '')
-                    ?.trim();
 
                 if (move && move !== '...') {
                     console.log("Replay move added:", move);
@@ -2460,7 +2457,9 @@
         });
 
         console.log("FINAL REPLAY MOVES:", replayMoves);
-        console.log("FINAL RAW MOVES:", rawAnalysisMoves);
+        if (typeof process === 'undefined' || process.env.NODE_ENV !== 'test') {
+            console.log("FINAL RAW MOVES:", rawAnalysisMoves);
+        }
 
         if (window.Chess) {
             replayBoard = new window.Chess();

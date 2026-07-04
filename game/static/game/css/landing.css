@@ -415,10 +415,7 @@ body {
     position: fixed;
     pointer-events: none;
 
-    z-index:99999;
-
     z-index: 9990;
-
     width: 18px;
     height: 18px;
     border-radius: 50%;
