@@ -4050,7 +4050,8 @@ def forum_new(request):
 
             messages.error(
                 request,
-                "You can create only one discussion per day."
+                "You are creating discussions too quickly. "
+                "Please wait before trying again."
             )
 
             return redirect("forum")
