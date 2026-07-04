@@ -1088,9 +1088,7 @@
         }
 
         board = parseBoard(data.board);
-        if (process.env.NODE_ENV !== "test") {
-        console.log("SERVER DATA ON AI MOVE:", data);
-        }
+
         turn = data.current_turn;
         whiteTime = data.white_time;
         blackTime = data.black_time;
@@ -4124,111 +4122,106 @@
     const sanMoveBtn = document.getElementById('sanMoveBtn');
     const sanMoveError = document.getElementById('sanMoveError');
 
-    async function handleSanMove() {
-        if (!sanMoveInput) return;
-        let san = sanMoveInput.value.trim();
-        if (!san) return;
-        
-        if (sanMoveError) sanMoveError.style.display = 'none';
+    let isSanMoveInFlight = false;  
 
-        if (paused || gameOver) {
-            if (sanMoveError) {
-                sanMoveError.textContent = 'Game is not active';
-                sanMoveError.style.display = 'block';
-            }
-            flashBoard();
-            return;
+async function handleSanMove() {
+    if (!sanMoveInput) return;
+    if (isSanMoveInFlight) return;
+    let san = sanMoveInput.value.trim();
+    if (!san) return;
+    
+    if (sanMoveError) sanMoveError.style.display = 'none';
+
+    if (paused || gameOver) {
+        if (sanMoveError) {
+            sanMoveError.textContent = 'Game is not active';
+            sanMoveError.style.display = 'block';
         }
-
-        if (gameMode === 'ai' && turn !== playerColor) {
-            if (sanMoveError) {
-                sanMoveError.textContent = 'Not your turn';
-                sanMoveError.style.display = 'block';
-            }
-            flashBoard();
-            return;
-        }
-
-        if (sanMoveBtn) sanMoveBtn.disabled = true;
-
-        try {
-            const data = await get('/api/state/');
-            if (!data.fen) throw new Error("No FEN");
-            
-            if (!window.Chess) throw new Error("Chess engine not loaded");
-            const chess = new window.Chess(data.fen);
-            
-            // Minimal normalization: fix casing so chess.js can parse user input
-            // Rules:
-            //   - Castling variants: map to standard O-O / O-O-O
-            //   - Uppercase [NBRQK]: definite piece move — uppercase first char, lowercase body, preserve suffix
-            //   - Lowercase [nrqk]: definite piece move (n,r,q,k are not valid pawn files) — same as above
-            //   - Lowercase 'b' and all [a-h]/[A-H]: pawn move — lowercase entire body, preserve suffix
-            // Promotion suffix (=Q/=R etc) is always uppercased; check/checkmate (+/#) is preserved as-is.
-            if (/^[0oO]-[0oO]-[0oO]$/i.test(san)) {
-                san = 'O-O-O';
-            } else if (/^[0oO]-[0oO]$/i.test(san)) {
-                san = 'O-O';
-            } else {
-                // Strip trailing check/checkmate and promotion to preserve them exactly
-                const promoMatch = san.match(/=([qrbnQRBN])([+#]?)$/);
-                const suffix = promoMatch
-                    ? `=${promoMatch[1].toUpperCase()}${promoMatch[2]}`
-                    : san.match(/[+#]$/) ? san.slice(-1) : '';
-                const body = promoMatch
-                    ? san.slice(0, san.lastIndexOf('='))
-                    : suffix ? san.slice(0, -1) : san;
-
-                if (/^[NBRQK]/.test(san) || /^[nrqk]/.test(san)) {
-                    // Piece move: uppercase first char, lowercase rest of body
-                    san = body.charAt(0).toUpperCase() + body.slice(1).toLowerCase() + suffix;
-                } else if (/^[a-h]/i.test(san)) {
-                    // Pawn move (files a-h, including lowercase 'b'): fully lowercase body
-                    san = body.toLowerCase() + suffix;
-                }
-            }
-            
-            const moveObj = chess.move(san);
-            if (!moveObj) {
-                if (sanMoveError) {
-                    sanMoveError.textContent = 'Invalid or illegal move notation';
-                    sanMoveError.style.display = 'block';
-                }
-                flashBoard();
-                if (sanMoveBtn) sanMoveBtn.disabled = false;
-                return;
-            }
-            
-            const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-            const ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
-            
-            const fc = files.indexOf(moveObj.from[0]);
-            const fr = ranks.indexOf(moveObj.from[1]);
-            const tc = files.indexOf(moveObj.to[0]);
-            const tr = ranks.indexOf(moveObj.to[1]);
-            const promo = moveObj.promotion || null;
-            
-            const result = await executeMove(fr, fc, tr, tc, promo);
-            if (result && result.success) {
-                sanMoveInput.value = '';
-                sanMoveInput.blur();
-            } else {
-                if (sanMoveError) {
-                    sanMoveError.textContent = (result && result.message) ? result.message : 'Move rejected';
-                    sanMoveError.style.display = 'block';
-                }
-                flashBoard();
-            }
-        } catch (err) {
-            console.error('SAN Move Error:', err);
-            if (sanMoveError) {
-                sanMoveError.textContent = 'Error processing move';
-                sanMoveError.style.display = 'block';
-            }
-        } finally {
-            if (sanMoveBtn) sanMoveBtn.disabled = false;
-        }
+        flashBoard();
+        return;
     }
+
+    if (gameMode === 'ai' && turn !== playerColor) {
+        if (sanMoveError) {
+            sanMoveError.textContent = 'Not your turn';
+            sanMoveError.style.display = 'block';
+        }
+        flashBoard();
+        return;
+    }
+
+    isSanMoveInFlight = true;
+    if (sanMoveBtn) sanMoveBtn.disabled = true;
+
+    try {
+        const data = await get('/api/state/');
+        if (!data.fen) throw new Error("No FEN");
+        
+        if (!window.Chess) throw new Error("Chess engine not loaded");
+        const chess = new window.Chess(data.fen);
+        
+        if (/^[0oO]-[0oO]-[0oO]$/i.test(san)) {
+            san = 'O-O-O';
+        } else if (/^[0oO]-[0oO]$/i.test(san)) {
+            san = 'O-O';
+        } else {
+            const promoMatch = san.match(/=([qrbnQRBN])([+#]?)$/);
+            const suffix = promoMatch
+                ? `=${promoMatch[1].toUpperCase()}${promoMatch[2]}`
+                : san.match(/[+#]$/) ? san.slice(-1) : '';
+            const body = promoMatch
+                ? san.slice(0, san.lastIndexOf('='))
+                : suffix ? san.slice(0, -1) : san;
+
+            if (/^[NBRQK]/.test(san) || /^[nrqk]/.test(san)) {
+                san = body.charAt(0).toUpperCase() + body.slice(1).toLowerCase() + suffix;
+            } else if (/^[a-h]/i.test(san)) {
+                san = body.toLowerCase() + suffix;
+            }
+        }
+        
+        const moveObj = chess.move(san);
+        if (!moveObj) {
+            if (sanMoveError) {
+                sanMoveError.textContent = 'Invalid or illegal move notation';
+                sanMoveError.style.display = 'block';
+            }
+            flashBoard();
+            if (sanMoveBtn) sanMoveBtn.disabled = false;
+            return;
+        }
+        
+        const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+        const ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
+        
+        const fc = files.indexOf(moveObj.from[0]);
+        const fr = ranks.indexOf(moveObj.from[1]);
+        const tc = files.indexOf(moveObj.to[0]);
+        const tr = ranks.indexOf(moveObj.to[1]);
+        const promo = moveObj.promotion || null;
+        
+        const result = await executeMove(fr, fc, tr, tc, promo);
+        if (result && result.success) {
+            sanMoveInput.value = '';
+            sanMoveInput.blur();
+        } else {
+            if (sanMoveError) {
+                sanMoveError.textContent = (result && result.message) ? result.message : 'Move rejected';
+                sanMoveError.style.display = 'block';
+            }
+            flashBoard();
+        }
+    } catch (err) {
+        console.error('SAN Move Error:', err);
+        if (sanMoveError) {
+            sanMoveError.textContent = 'Error processing move';
+            sanMoveError.style.display = 'block';
+        }
+    } finally {
+        isSanMoveInFlight = false;
+        if (sanMoveBtn) sanMoveBtn.disabled = false;
+    }
+}
 
     if (sanMoveInput) {
         sanMoveInput.addEventListener('keydown', (e) => {
