@@ -446,11 +446,11 @@
             <div class="card status-card">
                 <div class="status-bar" id="statusBar">
                     <div id="replayControls" class="replay-controls hidden" aria-label="Game Replay Controls" role="group">
-                        <button id="firstReplayBtn" aria-label="Go to first move">⏮</button>
-                        <button id="prevReplayBtn" aria-label="Go to previous move">◀</button>
-                        <button id="playReplayBtn" aria-label="Play/Pause automatic replay">▶</button>
-                        <button id="nextReplayBtn" aria-label="Go to next move">▶▶</button>
-                        <button id="lastReplayBtn" aria-label="Go to last move">⏭</button>
+                        <button type="button" id="firstReplayBtn" aria-label="Go to first move">⏮</button>
+                        <button type="button" id="prevReplayBtn" aria-label="Go to previous move">◀</button>
+                        <button type="button" id="playReplayBtn" aria-label="Play/Pause automatic replay">▶</button>
+                        <button type="button" id="nextReplayBtn" aria-label="Go to next move">▶▶</button>
+                        <button type="button" id="lastReplayBtn" aria-label="Go to last move">⏭</button>
                     </div>
                     <!--Score bar-->
                     <div id="game-status">Game started</div>
@@ -474,7 +474,7 @@
 
                     <div style="margin-top: 10px;">
                         <div style="display: flex; flex-direction: column; gap: 4px;">
-                            <input type="text" id="manualMoveInput" placeholder="Move (e.g. e2e4)" style="padding: 10px; border-radius: 5px; border: 1px solid #444; background: #1a1a2e; color: #fff; font-size: 0.9rem;" maxlength="5">
+                            <input type="text" id="manualMoveInput" aria-label="Enter manual move notation" placeholder="Move (e.g. e2e4)" style="padding: 10px; border-radius: 5px; border: 1px solid #444; background: #1a1a2e; color: #fff; font-size: 0.9rem;" maxlength="5">
                             <div id="manualMoveError" style="color: #ff6b6b; font-size: 0.8rem; display: none;">Invalid move format</div>
                         </div>
                     </div>
@@ -522,7 +522,7 @@
                 <div class="card-title">Game Controls</div>
                 <div style="display: flex; flex-direction: column; gap: 8px;">
                     <button type="button" class="btn btn-gold" id="flipBtn" title="Shortcut: F">Flip Board<span class="btn-shortcut">F</span></button>
-                    <button class="btn btn-gold" id="blindfoldBtn">Blindfold: OFF</button>
+                    <button type="button" class="btn btn-gold" id="blindfoldBtn">Blindfold: OFF</button>
                     <button class="btn btn-gold" id="newPvPBtn">Pass & Play (PvP)</button>
                     <button class="btn btn-gold" id="newAIBtn">Play vs AI</button>
                     <button type="button" class="btn btn-gold" id="dailyPuzzleBtn">Daily Puzzle</button>
@@ -539,7 +539,7 @@
                     <button type="button" class="btn btn-gold" id="drawBtn" title="Shortcut: D">Offer Draw<span class="btn-shortcut">D</span></button>
                     <button type="button" class="btn btn-warning" id="pauseBtn" title="Shortcut: P">Pause<span class="btn-shortcut">P</span></button>
                     <button type="button" class="btn btn-danger" id="resignBtn" title="Shortcut: R">Resign<span class="btn-shortcut">R</span></button>
-                    <button class="btn btn-gold" style="width: 100%;" onclick="document.getElementById('rulebookModal').style.display='flex'">📖 Rulebook</button>
+                    <button type="button" class="btn btn-gold" style="width: 100%;" onclick="document.getElementById('rulebookModal').style.display='flex'">📖 Rulebook</button>
                 </div>
                 <a href="/" class="btn" style="background: #2a1414; color: #ff6b6b;margin-top: 1rem;margin-bottom: 1.5rem; border: 1px solid #632424; text-decoration: none; text-align: center; display: block; line-height: 2.5;">EXIT TO HOME</a>
             </div>
@@ -547,11 +547,11 @@
             <div class="card" id="emotePanel" style="display: none;">
                 <div class="card-title">React</div>
                 <div style="display: flex; gap: 8px; justify-content: space-around; font-size: 1.5rem; flex-wrap: wrap;">
-                    <button class="emote-btn" data-emote="👍" aria-label="React with Thumbs Up" style="background:none;border:none;cursor:pointer;transition:transform 0.2s;">👍</button>
-                    <button class="emote-btn" data-emote="🤝" aria-label="React with Shake Hands" style="background:none;border:none;cursor:pointer;transition:transform 0.2s;">🤝</button>
-                    <button class="emote-btn" data-emote="😂" aria-label="React with Laughing" style="background:none;border:none;cursor:pointer;transition:transform 0.2s;">😂</button>
-                    <button class="emote-btn" data-emote="😮" aria-label="React with Surprised" style="background:none;border:none;cursor:pointer;transition:transform 0.2s;">😮</button>
-                    <button class="emote-btn" data-emote="🏳️" aria-label="Offer Resignation Emote" style="background:none;border:none;cursor:pointer;transition:transform 0.2s;">🏳️</button>
+                    <button type="button" class="emote-btn" data-emote="👍" aria-label="React with Thumbs Up" style="background:none;border:none;cursor:pointer;transition:transform 0.2s;">👍</button>
+                    <button type="button" class="emote-btn" data-emote="🤝" aria-label="React with Shake Hands" style="background:none;border:none;cursor:pointer;transition:transform 0.2s;">🤝</button>
+                    <button type="button" class="emote-btn" data-emote="😂" aria-label="React with Laughing" style="background:none;border:none;cursor:pointer;transition:transform 0.2s;">😂</button>
+                    <button type="button" class="emote-btn" data-emote="😮" aria-label="React with Surprised" style="background:none;border:none;cursor:pointer;transition:transform 0.2s;">😮</button>
+                    <button type="button" class="emote-btn" data-emote="🏳️" aria-label="Offer Resignation Emote" style="background:none;border:none;cursor:pointer;transition:transform 0.2s;">🏳️</button>
                 </div>
             </div>
         </div>

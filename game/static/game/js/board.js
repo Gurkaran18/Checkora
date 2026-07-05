@@ -5245,10 +5245,12 @@ ${message}
         });
     }
 
-    if (closeBtn && mobilePanel && toggleBtn) {
+    if (closeBtn && mobilePanel) {
         closeBtn.addEventListener('click', function () {
             mobilePanel.classList.remove('active');
-            toggleBtn.setAttribute('aria-expanded', 'false');
+            if (toggleBtn) {
+                toggleBtn.setAttribute('aria-expanded', 'false');
+            }
         });
     }
 });

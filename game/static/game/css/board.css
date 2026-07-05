@@ -680,7 +680,7 @@ body {
     --square-size: clamp(
         26px,
         calc(
-            (100vw - 3 * var(--panel-width) - 3 * var(--layout-gap)
+            (100vw - var(--panel-width) - var(--layout-gap)
                 - 2 * var(--layout-padding-x) - var(--board-chrome)) / 8
         ),
         60px
@@ -1215,8 +1215,7 @@ body {
         flex-direction: row;
         flex-wrap: wrap;
     }
-    .panel .card,
-    .sidebar-container .card { flex: 1; min-width: 200px; }
+    .panel .card { flex: 1; min-width: 200px; }
 }
 
 @media (max-width: 768px) {
