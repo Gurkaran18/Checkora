@@ -1841,7 +1841,11 @@ def stats_view(request):
     )
 
     recent_history = history[:10]
-    
+
+    history_all = RatingHistory.objects.filter(
+        user=request.user
+    ).order_by('created_at')
+
     # Color Statistics
     games_as_white = user_results.filter(
         player_color="white"
@@ -1959,6 +1963,7 @@ def stats_view(request):
         'progress': progress,
         'rating': rating,
         'history': recent_history,
+        'history_all': history_all,
         
         "total_games": total_games,
         "total_wins": total_wins,
