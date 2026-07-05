@@ -669,8 +669,13 @@ def ai_move(request):
         })
 
     engine = import_module(settings.SESSION_ENGINE)
-    store = engine.SessionStore(session_key=request.session.session_key)
-    latest_game = store.get('game', {})
+    try:
+        store = engine.SessionStore(session_key=request.session.session_key)
+        latest_game = store.get('game', {})
+    except Exception as e:
+        logger.error(f"Failed to read session state during AI move: {e}")
+        return JsonResponse({'valid': False, 'message': 'Internal error verifying game state.'}, status=500)
+
     if latest_game.get('paused'):
         err_msg = 'Game is paused.'
         return JsonResponse(
@@ -683,7 +688,17 @@ def ai_move(request):
     )
 
     if success:
-        request.session['game'] = game.to_dict()
+        try:
+            final_store = engine.SessionStore(session_key=request.session.session_key)
+            final_game = final_store.get('game', {})
+            authoritative_paused = final_game.get('paused', game.paused)
+        except Exception as e:
+            logger.error(f"Failed to read session state during AI save: {e}")
+            return JsonResponse({'valid': False, 'message': 'Internal error saving game state.'}, status=500)
+
+        game_dict = game.to_dict()
+        game_dict['paused'] = authoritative_paused
+        request.session['game'] = game_dict
         request.session.modified = True
 
         create_or_update_active_game(
