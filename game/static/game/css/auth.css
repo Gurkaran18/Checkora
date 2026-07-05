@@ -32,7 +32,7 @@ html, body {
 body {
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    font-family: 'Outfit', system-ui, sans-serif;
     min-height: 100vh;
     display: flex;
     justify-content: center;
