@@ -287,9 +287,9 @@
             <!-- Rest stays the same -->
             <div id="modeSelection" style="display: flex; flex-direction: column; gap: 14px;">
 
-                <button class="btn btn-gold" id="welcomePvPBtn" style="padding: 12px; font-size: 1.05rem;">Pass & Play
+                <button type="button" class="btn btn-gold" id="welcomePvPBtn" style="padding: 12px; font-size: 1.05rem;">Pass & Play
                     (PvP)</button>
-                <button class="btn btn-gold" id="welcomeAIBtn" style="padding: 12px; font-size: 1.05rem;">Play vs
+                <button type="button" class="btn btn-gold" id="welcomeAIBtn" style="padding: 12px; font-size: 1.05rem;">Play vs
                     AI</button>
                 <button type="button"
                         class="btn btn-gold"
@@ -376,14 +376,14 @@
             <!-- Opponent Info (Top) -->
             <div class="player-info top-player">
                 <div class="player-details">
-                    <img id="blackPlayerAvatar" class="nav-avatar" src="" style="display:none; width:20px; height:20px; border-radius:50%; object-fit:cover;">
+                    <img id="blackPlayerAvatar" class="nav-avatar" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="" style="display:none; width:20px; height:20px; border-radius:50%; object-fit:cover;">
                     <span id="blackNameLabel">BLACK</span>
                     <span id="blackYouTag" style="display: none; color: #f0c040; margin-left: 4px; font-size: 0.8em;">(YOU)</span>
                     <div class="captured-list" id="blackCaptured"></div>
                     <div class="captured-score">Points: <span id="blackPoints">+0</span> <span id="blackAdvantage" class="material-advantage" style="display: none; margin-left: 6px; font-weight: 700; color: #4ade80;"></span></div>
                     <!-- Hidden elements kept for JS compatibility -->
                     <div class="captured-meta" style="display:none;">
-                        <img id="blackCapturedAvatar" class="nav-avatar" src="" style="display:none; width:18px; height:18px; border-radius:50%; object-fit:cover;">
+                        <img id="blackCapturedAvatar" class="nav-avatar" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="" style="display:none; width:18px; height:18px; border-radius:50%; object-fit:cover;">
                         Captured by <span id="blackCapturedName">Black</span>
                     </div>
                 </div>
@@ -414,14 +414,14 @@
             <!-- Player Info (Bottom) -->
             <div class="player-info bottom-player">
                 <div class="player-details">
-                    <img id="whitePlayerAvatar" class="nav-avatar" src="" style="display:none; width:20px; height:20px; border-radius:50%; object-fit:cover;">
+                    <img id="whitePlayerAvatar" class="nav-avatar" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="" style="display:none; width:20px; height:20px; border-radius:50%; object-fit:cover;">
                     <span id="whiteNameLabel">WHITE</span>
                     <span id="whiteYouTag" style="display: none; color: #f0c040; margin-left: 4px; font-size: 0.8em;">(YOU)</span>
                     <div class="captured-list" id="whiteCaptured"></div>
                     <div class="captured-score">Points: <span id="whitePoints">+0</span> <span id="whiteAdvantage" class="material-advantage" style="display: none; margin-left: 6px; font-weight: 700; color: #4ade80;"></span></div>
                     <!-- Hidden elements kept for JS compatibility -->
                     <div class="captured-meta" style="display:none;">
-                        <img id="whiteCapturedAvatar" class="nav-avatar" src="" style="display:none; width:18px; height:18px; border-radius:50%; object-fit:cover;">
+                        <img id="whiteCapturedAvatar" class="nav-avatar" src="data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=" alt="" style="display:none; width:18px; height:18px; border-radius:50%; object-fit:cover;">
                         Captured by <span id="whiteCapturedName">White</span>
                     </div>
                 </div>
@@ -442,7 +442,7 @@
 
         <!-- Consolidated Sidebar -->
         <div class="sidebar-container" id="mobilePanel">
-            <button id="mobileControlsClose" aria-label="Close controls" class="mobile-close-btn">&times;</button>
+            <button type="button" id="mobileControlsClose" aria-label="Close controls" class="mobile-close-btn">&times;</button>
             <div class="card status-card">
                 <div class="status-bar" id="statusBar">
                     <div id="replayControls" class="replay-controls hidden" aria-label="Game Replay Controls" role="group">

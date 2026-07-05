@@ -1914,7 +1914,7 @@
                     if (data.game_status === 'check') {
                         applyCheckHighlight();
                         const checkMsg = turn === 'white' ? 'Check to White King!' : 'Check to Black King!';
-                        // showStatus(checkMsg, true);
+
                         a11yMsg += checkMsg;
                     } else {
                         highlightCheck();
@@ -2033,7 +2033,7 @@
                     if (data.game_status === 'check') {
                         applyCheckHighlight();
                         const checkMsg = turn === 'white' ? 'Check to White King!' : 'Check to Black King!';
-                        // showStatus(checkMsg, true);
+
                         a11yMsg += checkMsg;
                     } else {
                         highlightCheck();

@@ -39,7 +39,7 @@
     </div>
     {% if user.is_authenticated %}
     <div class="profile-dropdown">
-      <button type="button" class="profile-btn" style="display:flex;align-items:center;gap:4px;">
+      <button type="button" class="profile-btn" aria-haspopup="true" aria-expanded="false" style="display:flex;align-items:center;gap:4px;">
         {% if user.profile.avatar %}
           <img src="{{ user.profile.avatar }}" class="nav-avatar" alt="">
         {% else %}

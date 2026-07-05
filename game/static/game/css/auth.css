@@ -32,7 +32,7 @@ html, body {
 body {
     background-color: var(--bg-primary);
     color: var(--text-primary);
-    font-family: 'Outfit', system-ui, sans-serif;
+    font-family: Outfit, system-ui, sans-serif;
     min-height: 100vh;
     display: flex;
     justify-content: center;
@@ -57,6 +57,9 @@ body {
     text-align: center;
 }
 
+.header--with-navbar {
+    margin-top: 40px;
+}
 .logo-container {
     display: flex;
     align-items: center;
