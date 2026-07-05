@@ -1951,6 +1951,9 @@
             // fix: abort if game ended during delay
             if (gameOver) return;
 
+            // fix: abort if game paused during delay
+            if (paused) return;
+
             const data = await post('/api/ai-move/', {});
             
 

@@ -1076,6 +1076,62 @@ class AIMoveTest(TestCase):
         self.assertIn('to_row', data['ai_move'])
         self.assertIn('to_col', data['ai_move'])
 
+    def test_ai_aborts_if_game_paused(self):
+        self.client.post(
+            '/api/new-game/', data=json.dumps({'mode': 'ai'}),
+            content_type='application/json'
+        )
+
+        # Pause the game
+        self.client.post(
+            '/api/pause/', data=json.dumps({'pause': True}),
+            content_type='application/json'
+        )
+
+        state_before = self.client.get('/api/state/').json()
+
+        # Try to make AI move
+        r = self.client.post('/api/ai-move/', content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+
+        data = r.json()
+        self.assertFalse(data['valid'])
+        self.assertEqual(data['message'], 'Game is paused.')
+
+        state_after = self.client.get('/api/state/').json()
+        self.assertEqual(state_before['board'], state_after['board'])
+        self.assertEqual(state_before['current_turn'], state_after['current_turn'])
+        self.assertEqual(state_before['move_history'], state_after['move_history'])
+
+    def test_ai_succeeds_after_resume(self):
+        self.client.post(
+            '/api/new-game/', data=json.dumps({'mode': 'ai'}),
+            content_type='application/json'
+        )
+
+        # Pause the game
+        self.client.post(
+            '/api/pause/', data=json.dumps({'pause': True}),
+            content_type='application/json'
+        )
+
+        # Resume the game
+        self.client.post(
+            '/api/pause/', data=json.dumps({'pause': False}),
+            content_type='application/json'
+        )
+
+        # Try to make AI move
+        r = self.client.post('/api/ai-move/', content_type='application/json')
+        data = r.json()
+
+        self.assertTrue(data['valid'])
+        self.assertEqual(data['current_turn'], 'black')
+        self.assertIn('from_row', data['ai_move'])
+        self.assertIn('from_col', data['ai_move'])
+        self.assertIn('to_row', data['ai_move'])
+        self.assertIn('to_col', data['ai_move'])
+
 
 class OpeningBookTest(SimpleTestCase):
     """Unit tests for the opening-book integration in ChessGame."""

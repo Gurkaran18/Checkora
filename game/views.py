@@ -596,6 +596,12 @@ def ai_move(request):
             {'valid': False, 'message': err_msg}, status=400
         )
 
+    if game.paused:
+        err_msg = 'Game is paused.'
+        return JsonResponse(
+            {'valid': False, 'message': err_msg}, status=400
+        )
+
     # Depth Mapping — lower depth = faster response
     difficulty = request.session.get('difficulty', 'medium')
     depth_map = {'easy': 1, 'medium': 2, 'hard': 3}
