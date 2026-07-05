@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Checkora - Game Stats</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" defer></script>
     <style>
         body {
             background: radial-gradient(circle at top, #1e293b 0%, #0f172a 45%, #020617 100%);
@@ -572,9 +572,9 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 10px;">
                 <div style="font-size: 0.95rem; color: #94a3b8; font-weight: 600;">Rating Over Time</div>
                 <div class="timeframe-buttons" style="display: flex; gap: 8px;">
-                    <button class="btn-timeframe active" data-days="7">7 Days</button>
-                    <button class="btn-timeframe" data-days="30">30 Days</button>
-                    <button class="btn-timeframe" data-days="all">All-Time</button>
+                    <button type="button" class="btn-timeframe active" data-days="7">7 Days</button>
+                    <button type="button" class="btn-timeframe" data-days="30">30 Days</button>
+                    <button type="button" class="btn-timeframe" data-days="all">All-Time</button>
                 </div>
             </div>
             <div style="position: relative; height: 300px; width: 100%;">
@@ -583,20 +583,7 @@
         </div>
 
         <!-- Rating History Data Source for JavaScript -->
-        <script id="rating-history-data" type="application/json">
-            [
-                {% for item in history_all %}
-                {
-                    "date": "{{ item.created_at|date:'Y-m-d H:i' }}",
-                    "timestamp": {{ item.created_at|date:'U' }},
-                    "old_rating": {{ item.old_rating }},
-                    "new_rating": {{ item.new_rating }},
-                    "change": {{ item.rating_change }},
-                    "result": "{{ item.result }}"
-                }{% if not forloop.last %},{% endif %}
-                {% endfor %}
-            ]
-        </script>
+        {{ chart_history|json_script:"rating-history-data" }}
         {% else %}
         <div class="empty-state">
             <span class="empty-state-icon">📈</span>
