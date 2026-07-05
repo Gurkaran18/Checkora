@@ -1132,6 +1132,42 @@ class AIMoveTest(TestCase):
         self.assertIn('to_row', data['ai_move'])
         self.assertIn('to_col', data['ai_move'])
 
+    @mock.patch('game.engine.ChessGame.get_ai_move')
+    def test_ai_aborts_if_paused_during_calculation(self, mock_get_ai_move):
+        self.client.post(
+            '/api/new-game/', data=json.dumps({'mode': 'ai'}),
+            content_type='application/json'
+        )
+
+        def side_effect(depth=None):
+            # simulate concurrent pause
+            from importlib import import_module
+            from django.conf import settings
+            engine = import_module(settings.SESSION_ENGINE)
+            store = engine.SessionStore(session_key=self.client.session.session_key)
+            game_data = store.get('game', {})
+            game_data['paused'] = True
+            store['game'] = game_data
+            store.save()
+            return {'from_row': 1, 'from_col': 4, 'to_row': 3, 'to_col': 4}
+
+        mock_get_ai_move.side_effect = side_effect
+
+        state_before = self.client.get('/api/state/').json()
+
+        # Try to make AI move
+        r = self.client.post('/api/ai-move/', content_type='application/json')
+        self.assertEqual(r.status_code, 400)
+
+        data = r.json()
+        self.assertFalse(data['valid'])
+        self.assertEqual(data['message'], 'Game is paused.')
+
+        state_after = self.client.get('/api/state/').json()
+        self.assertEqual(state_before['board'], state_after['board'])
+        self.assertEqual(state_before['current_turn'], state_after['current_turn'])
+        self.assertEqual(state_before['move_history'], state_after['move_history'])
+
 
 class OpeningBookTest(SimpleTestCase):
     """Unit tests for the opening-book integration in ChessGame."""

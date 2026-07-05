@@ -2,6 +2,7 @@
 import logging
 import json
 import time
+from importlib import import_module
 from functools import wraps
 import hashlib
 import math
@@ -666,6 +667,15 @@ def ai_move(request):
             'captured_pieces': game.captured,
             'message': '',
         })
+
+    engine = import_module(settings.SESSION_ENGINE)
+    store = engine.SessionStore(session_key=request.session.session_key)
+    latest_game = store.get('game', {})
+    if latest_game.get('paused'):
+        err_msg = 'Game is paused.'
+        return JsonResponse(
+            {'valid': False, 'message': err_msg}, status=400
+        )
 
     success, message, captured, game_status = game.make_move(
         best['from_row'], best['from_col'],
