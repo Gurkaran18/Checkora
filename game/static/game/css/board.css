@@ -3345,3 +3345,101 @@ body.blindfold-mode .capture-ring {
 
 .board-container.flipped .top-player { order: 4; }
 .board-container.flipped .bottom-player { order: 2; }
+
+/* ── Move Stepper Controls ── */
+.move-stepper-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(0, 0, 0, 0.15);
+    border-bottom-left-radius: 8px;
+    border-bottom-right-radius: 8px;
+}
+
+.stepper-btn {
+    background: transparent;
+    border: 1.5px solid rgba(240, 192, 64, 0.35);
+    color: #f0c040;
+    padding: 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stepper-btn:hover:not(:disabled) {
+    background: rgba(240, 192, 64, 0.12);
+    border-color: #f0c040;
+    box-shadow: 0 0 10px rgba(240, 192, 64, 0.25);
+    transform: translateY(-1px);
+}
+
+.stepper-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.stepper-btn:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+    border-color: rgba(255, 255, 255, 0.1);
+    color: #64748b;
+}
+
+/* ── Active Move Sidebar Highlight ── */
+.moves-list .selected-move {
+    background: rgba(240, 192, 64, 0.22) !important;
+    color: #fff !important;
+    box-shadow: inset 0 0 0 1.5px #f0c040;
+    border-radius: 4px;
+    font-weight: 700;
+}
+
+/* ── Floating Resume Game Button ── */
+.resume-game-floating-btn {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translate(-50%, 0);
+    background: linear-gradient(135deg, #f0c040, #d4a020);
+    color: #1a1a2e !important;
+    font-weight: 700;
+    font-size: 0.95rem;
+    letter-spacing: 0.5px;
+    padding: 10px 24px;
+    border-radius: 30px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45), 0 0 15px rgba(240, 192, 64, 0.35);
+    z-index: 100;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    animation: pulseResume 2s infinite ease-in-out;
+}
+
+.resume-game-floating-btn:hover {
+    background: linear-gradient(135deg, #f5cc55, #e0b030);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), 0 0 20px rgba(240, 192, 64, 0.5);
+    transform: translate(-50%, -2px);
+}
+
+.resume-game-floating-btn:active {
+    transform: translate(-50%, 0);
+}
+
+.resume-game-floating-btn.hidden {
+    display: none !important;
+    pointer-events: none;
+}
+
+@keyframes pulseResume {
+    0%, 100% {
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45), 0 0 10px rgba(240, 192, 64, 0.3);
+    }
+    50% {
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45), 0 0 20px rgba(240, 192, 64, 0.65);
+    }
+}
