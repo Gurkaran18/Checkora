@@ -108,6 +108,7 @@
     let selectedIncrement = 0;
     let paused = false;
     let timerInterval = null;
+    let countdownInterval = null;
     let pendingPromo = null;
     let blindfoldMode = false;
     let illegalMoveCount = 0;
@@ -3202,30 +3203,33 @@
     }
 }
             function runStartCountdown(onComplete) {
-                if (!countdownOverlay || !countdownNumberEl) {
-                    onComplete();
-                    return;
-                }
+    if (!countdownOverlay || !countdownNumberEl) {
+        onComplete();
+        return;
+    }
 
-                const sequence = ['3', '2', '1', 'Go!'];
-                let idx = 0;
+    clearInterval(countdownInterval);
 
-                boardEl.classList.add('countdown-active');
-                countdownNumberEl.textContent = sequence[idx];
-                countdownOverlay.classList.add('active');
+    const sequence = ['3', '2', '1', 'Go!'];
+    let idx = 0;
 
-                const countdownInterval = setInterval(() => {
-                    idx++;
-                    if (idx < sequence.length) {
-                        countdownNumberEl.textContent = sequence[idx];
-                    } else {
-                        clearInterval(countdownInterval);
-                        countdownOverlay.classList.remove('active');
-                        boardEl.classList.remove('countdown-active');
-                        onComplete();
-                    }
-                }, 1000);
-            }
+    boardEl.classList.add('countdown-active');
+    countdownNumberEl.textContent = sequence[idx];
+    countdownOverlay.classList.add('active');
+
+    countdownInterval = setInterval(() => {
+        idx++;
+        if (idx < sequence.length) {
+            countdownNumberEl.textContent = sequence[idx];
+        } else {
+            clearInterval(countdownInterval);
+            countdownOverlay.classList.remove('active');
+            boardEl.classList.remove('countdown-active');
+            onComplete();
+        }
+    }, 1000);
+}
+               
             function startTimer() {
                 clearInterval(timerInterval);
                 timerInterval = setInterval(() => {
