@@ -1243,6 +1243,15 @@
         if (!welcomeOverlay.classList.contains('active')) {
             queueAIMoveIfNeeded();
         }
+
+        if (data.day_streak !== undefined) {
+            const streakCounter = document.getElementById("streak-counter");
+            const streakCount = document.getElementById("streak-count");
+            if (streakCounter && streakCount) {
+                streakCount.textContent = data.day_streak;
+                streakCounter.style.display = "block";
+            }
+        }
     }
 
     function updatePlayerNames(data) {

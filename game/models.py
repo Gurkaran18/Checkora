@@ -100,6 +100,15 @@ class UserProgress(models.Model):
         db_index=True
     )
 
+    day_streak = models.PositiveIntegerField(
+        default=0
+    )
+
+    last_played_date = models.DateField(
+        null=True,
+        blank=True
+    )
+
     def __str__(self) -> str:
         return (
             f"{self.user.username} "
