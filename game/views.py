@@ -1,7 +1,6 @@
 """Game views for the Checkora chess platform."""
 import logging
 import json
-import signal
 import time
 from functools import wraps
 import hashlib
@@ -2472,7 +2471,7 @@ def analyze_game_view(request):
                 is_best = (best_move['from_row'] == actual_from[0] and best_move['from_col'] == actual_from[1] and best_move['to_row'] == actual_to[0] and best_move['to_col'] == actual_to[1])
             else:
                 is_best = True
-                
+
             move_class = _classify_move(is_best, played_dict, best_move, game)
             if move_class == 'Blunder':
                 blunders += 1

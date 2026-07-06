@@ -998,7 +998,9 @@ DP cache is intentionally excluded to save cookie space."""
     AI_SEARCH_DEPTH_CPP = 4  # C++ is much faster, can search deeper
     AI_SEARCH_DEPTH_PYTHON = 3  # Python engine needs conservative depth
 
-    ANALYSIS_TIMEOUT_SECONDS = 10  # Max seconds for engine analysis before returning best-so-far move
+    # Max seconds for engine analysis before returning best move
+    ANALYSIS_TIMEOUT_SECONDS = 10
+
     def get_ai_move(self, depth=None):
         """Return the best move for the current position.
 
