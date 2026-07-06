@@ -205,18 +205,16 @@ def record_game_result(request, mode, winner, reason, player_color='white', move
     result.save()
 
     if user:
-        from game.models import UserProgress
-        from django.utils import timezone
-        from datetime import timedelta
-        progress, _ = UserProgress.objects.get_or_create(user=user)
-        today = timezone.localdate()
-        if progress.last_played_date != today:
-            if progress.last_played_date == today - timedelta(days=1):
-                progress.day_streak += 1
-            else:
-                progress.day_streak = 1
-            progress.last_played_date = today
-            progress.save(update_fields=['day_streak', 'last_played_date'])
+        with transaction.atomic():
+            progress, _ = UserProgress.objects.select_for_update().get_or_create(user=user)
+            today = timezone.localdate()
+            if progress.last_played_date != today:
+                if progress.last_played_date == today - timedelta(days=1):
+                    progress.day_streak += 1
+                else:
+                    progress.day_streak = 1
+                progress.last_played_date = today
+                progress.save(update_fields=['day_streak', 'last_played_date'])
 
     if user and mode == 'ai':
         update_player_rating(
@@ -556,7 +554,6 @@ def get_state(request):
     }
 
     if request.user.is_authenticated:
-        from game.models import UserProgress
         progress, _ = UserProgress.objects.get_or_create(user=request.user)
         response_data['day_streak'] = progress.day_streak
 

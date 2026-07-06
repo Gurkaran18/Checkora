@@ -11,7 +11,7 @@ from game.views import record_game_result
 class StreakCounterTest(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username='testuser', password='password')
-        self.client.login(username='testuser', password='password')
+        self.client.force_login(self.user)
 
     def test_first_completed_game_sets_streak_to_1(self):
         request = mock.MagicMock()
