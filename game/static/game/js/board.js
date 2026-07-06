@@ -1717,8 +1717,26 @@
             showStatus('Unable to reconnect. Please refresh.', true);
         }
         reconnecting = false;
-    } async function executeMove(fr, fc, tr, tc, promotionPiece, skipAnimation = false) {
+    }
+    
+    async function executeMove(fr, fc, tr, tc, promotionPiece, skipAnimation = false) {
         try {
+            // Opening Trainer validation (BEFORE backend update)
+            if (typeof openingTrainerMode !== 'undefined' && openingTrainerMode) {
+                const expectedMove = openingTrainerSteps[currentTrainerStep]?.expected_move;
+                if (expectedMove) {
+                    const playedMove =
+                        `${String.fromCharCode(97 + fc)}${8 - fr}` +
+                        `${String.fromCharCode(97 + tc)}${8 - tr}`;
+
+                    if (playedMove.toLowerCase() !== expectedMove.toLowerCase()) {
+                        showStatus(`Incorrect move. Expected: ${expectedMove}`, true);
+                        deselect();
+                        return { success: false, message: 'Incorrect move' };
+                    }
+                }
+            }
+
             const body = {
                 from_row: fr, from_col: fc,
                 to_row: tr, to_col: tc,
@@ -1727,37 +1745,12 @@
 
             const data = await post('/api/move/', body);
 
-            // Opening Trainer validation
-            if (typeof openingTrainerMode !== 'undefined' && openingTrainerMode) {
-                    const expectedMove =
-                    openingTrainerSteps[currentTrainerStep]?.expected_move;
-
-                const playedMove =
-                    `${toSquare(fr, fc)}-${toSquare(tr, tc)}`;
-
-                if (
-                    playedMove.toLowerCase() !== expectedMove.toLowerCase()
-                ) {
-                    showStatus(
-                        `Incorrect move. Expected: ${expectedMove}`,
-                        true
-                    );
-
-                    deselect();
-                    return;
-                }
-
+            // Advance Opening Trainer step after successful backend move
+            if (typeof openingTrainerMode !== 'undefined' && openingTrainerMode && data.valid) {
                 currentTrainerStep++;
-                if (
-                    currentTrainerStep >=
-                    openingTrainerSteps.length
-                ) {
+                if (currentTrainerStep >= openingTrainerSteps.length) {
                     openingTrainerMode = false;
-
-                    showStatus(
-                        "Opening sequence completed!",
-                        false
-                    );
+                    showStatus("Opening sequence completed!", false);
                 }
             }
 
