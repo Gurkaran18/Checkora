@@ -2033,6 +2033,51 @@
             if (data.valid) {
                 playSound(data);
                 const mv = data.ai_move;
+                
+                if (gameMode === 'analysis' && data.ai_move.predicted_responses) {
+                    // Issue #1630: Show predicted responses in Analysis Mode
+                    const predPanel = document.getElementById('aiPredictionPanel');
+                    const predSuggestedMove = document.getElementById('predSuggestedMove');
+                    const predResponsesList = document.getElementById('predResponsesList');
+                    
+                    if (predPanel && predSuggestedMove && predResponsesList) {
+                        const formatEval = (val) => {
+                            if (val === undefined || val === null) return '';
+                            const v = (val / 100).toFixed(2);
+                            return `(${v > 0 ? '+' + v : v})`;
+                        };
+
+                        const moveText = mv.notation || getSquareLabel(mv.to_row, mv.to_col);
+                        predSuggestedMove.textContent = '';
+                        const smStrong = document.createElement('strong');
+                        smStrong.textContent = moveText;
+                        predSuggestedMove.appendChild(smStrong);
+                        predSuggestedMove.appendChild(document.createTextNode(` ${formatEval(mv.eval)}`));
+
+                        predResponsesList.textContent = '';
+                        if (data.ai_move.predicted_responses.length === 0) {
+                            const li = document.createElement('li');
+                            li.textContent = 'No opponent response available. The position may be terminal.';
+                            predResponsesList.appendChild(li);
+                        } else {
+                            data.ai_move.predicted_responses.forEach((resp, index) => {
+                                const li = document.createElement('li');
+                                const respStrong = document.createElement('strong');
+                                respStrong.textContent = `${index + 1}. ${resp.notation}`;
+                                li.appendChild(respStrong);
+                                li.appendChild(document.createTextNode(` ${formatEval(resp.eval)}`));
+                                li.style.marginBottom = '5px';
+                                predResponsesList.appendChild(li);
+                            });
+                        }
+                        
+                        predPanel.style.display = 'block';
+                    }
+                } else {
+                    const predPanel = document.getElementById('aiPredictionPanel');
+                    if (predPanel) predPanel.style.display = 'none';
+                }
+
                 await animateMove(mv.from_row, mv.from_col, mv.to_row, mv.to_col);
                 board = parseBoard(data.board);
                 turn = data.current_turn;
