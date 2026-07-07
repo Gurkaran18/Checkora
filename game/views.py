@@ -204,6 +204,11 @@ def record_game_result(request, mode, winner, reason, player_color='white', move
     result.full_clean()
     result.save()
 
+    if user:
+        with transaction.atomic():
+            progress, _ = UserProgress.objects.select_for_update().get_or_create(user=user)
+            progress.update_streak()
+
     if user and mode == 'ai':
         update_player_rating(
             user,
@@ -519,7 +524,7 @@ def get_state(request):
         request.session['game']
     )
 
-    return JsonResponse({
+    response_data = {
         'board': game.board,
         'current_turn': game.current_turn,
         'white_time': game.white_time,
@@ -539,7 +544,13 @@ def get_state(request):
         'game_status': game.game_status,
         'draw_reason': game.draw_reason,
         'threefold_warning': game.threefold_warning,
-    })
+    }
+
+    if request.user.is_authenticated:
+        progress, _ = UserProgress.objects.get_or_create(user=request.user)
+        response_data['day_streak'] = progress.day_streak
+
+    return JsonResponse(response_data)
 
 
 @require_POST
