@@ -532,6 +532,23 @@ body {
     color: var(--text-secondary);
 }
 
+.turn-indicator-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 0 auto 12px;
+}
+
+.turn-indicator-row .turn-badge {
+    margin-bottom: 0;
+}
+
+.turn-indicator-row .game-counter-badge {
+    margin: 0;
+}
+
 /* ============================================================
    Session Score Tracker (W/L/D — resets on sessionStorage clear)
    ============================================================ */
@@ -3359,4 +3376,3 @@ body.blindfold-mode .capture-ring {
 
 .board-container.flipped .top-player { order: 4; }
 .board-container.flipped .bottom-player { order: 2; }
-

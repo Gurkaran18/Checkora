@@ -3436,7 +3436,6 @@
     }
 
     async function startNewGame(mode, pColor = 'white', difficulty = 'medium', fen = null, timeLimitMins = null, overrideNames = null, isPuzzle = false) {
-        incrementGameCounter();
         evaluationCache = {};
         if (!isPuzzle) {
             dailyPuzzleMode = false;
@@ -3565,6 +3564,7 @@
         gameOver = false;
         whiteAlertFired = false;
         blackAlertFired = false;
+        incrementGameCounter();
 
         gameStartTime = Date.now();
         

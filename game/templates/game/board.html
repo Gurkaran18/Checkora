@@ -364,10 +364,12 @@
 
         <!-- Board Monolith -->
         <div class="board-container">
-            <div class="turn-badge white" id="turnBadge">
-                <span id="turnBadgeText">White</span>'s Turn
+            <div class="turn-indicator-row">
+                <div class="turn-badge white" id="turnBadge">
+                    <span id="turnBadgeText">White</span>'s Turn
+                </div>
+                <span id="game-counter" class="game-counter-badge">Game #1</span>
             </div>
-            <span id="game-counter" class="game-counter-badge">Game #1</span>
             <div id="sessionScoreTracker" class="session-score-tracker">
                 <span class="score-item score-win">🏆 W <span id="sessionWins">0</span></span>
                 <span class="score-item score-loss">💀 L <span id="sessionLosses">0</span></span>
