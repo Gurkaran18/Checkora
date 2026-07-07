@@ -2273,6 +2273,54 @@ class TimeControlIncrementTest(TestCase):
         self.assertEqual(game_dict['increment'], 3)
         self.assertEqual(game_dict['white_time'], 300)
 
+    def test_update_clock_sub_second_call_deducts_nothing(self):
+        """A single call with < 1s elapsed must deduct 0 seconds."""
+        game = ChessGame(time_limit=600)
+        game.last_ts = 1000.0
+        game.white_time = 600
+        game.current_turn = 'white'
+        game.paused = False
+
+        with mock.patch('game.engine.time.time', return_value=1000.6):
+            game.update_clock()
+
+        self.assertEqual(game.white_time, 600)
+        self.assertEqual(game.last_ts, 1000.0)
+
+    def test_update_clock_remainder_accumulates_across_calls(self):
+        """Sub-second remainders must accumulate; 0.6+0.6 = 1.2 -> deduct 1."""
+        game = ChessGame(time_limit=600)
+        game.last_ts = 1000.0
+        game.white_time = 600
+        game.current_turn = 'white'
+        game.paused = False
+
+        with mock.patch('game.engine.time.time', return_value=1000.6):
+            game.update_clock()
+        self.assertEqual(game.white_time, 600)
+        self.assertEqual(game.last_ts, 1000.0)
+
+        with mock.patch('game.engine.time.time', return_value=1001.2):
+            game.update_clock()
+        self.assertEqual(game.white_time, 599)
+        self.assertEqual(game.last_ts, 1001.0)
+
+    def test_update_clock_high_frequency_no_time_leak(self):
+        """Repeated 0.4s polls must deduct only floor(total elapsed) seconds."""
+        game = ChessGame(time_limit=600)
+        game.last_ts = 0.0
+        game.white_time = 600
+        game.current_turn = 'white'
+        game.paused = False
+
+        for i in range(1, 11):
+            with mock.patch('game.engine.time.time', return_value=i * 0.4):
+                game.update_clock()
+
+        total_elapsed = 10 * 0.4  # 4.0 s
+        self.assertEqual(game.white_time, 600 - int(total_elapsed))
+        self.assertEqual(game.last_ts, float(int(total_elapsed)))
+
 
 class GameResultMoveHistoryTest(TestCase):
     """Test suite for verifying persistent move history storage in GameResult."""
