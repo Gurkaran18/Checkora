@@ -675,7 +675,8 @@ def ai_move(request):
                     ),
                     'eval': opp_resp.get('eval')
                 })
-                for alt in opp_resp.get('alts', []):
+                # Cap the alts before running the notation loop
+                for alt in opp_resp.get('alts', [])[:2]:
                     predicted_responses.append({
                         'notation': temp_game._notation(
                             alt['from_row'], alt['from_col'], 
@@ -687,9 +688,9 @@ def ai_move(request):
                         'eval': alt.get('eval')
                     })
             
-            best['predicted_responses'] = predicted_responses[:3]
-        except Exception as e:
-            logger.error(f"Failed to predict opponent responses: {e}")
+            best['predicted_responses'] = predicted_responses
+        except Exception:
+            logger.exception("Failed to predict opponent responses")
 
     if not best:
         if game.game_status == 'checkmate':

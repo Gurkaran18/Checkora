@@ -12,11 +12,13 @@ class Issue1630PredictionTest(TestCase):
         self.game = ChessGame()
         self.game.mode = 'analysis'
         session['game'] = self.game.to_dict()
-        session['game']['mode'] = 'analysis'
         session.save()
 
     @patch('game.engine.ChessGame.get_ai_move')
     def test_prediction_data_generated_in_analysis_mode(self, mock_get_ai_move):
+        # mock_get_ai_move is called twice:
+        # 1. By the main game instance to get the best move
+        # 2. By the temp_game instance to predict opponent responses
         mock_get_ai_move.side_effect = [
             {'from_row': 6, 'from_col': 4, 'to_row': 4, 'to_col': 4, 'eval': 40, 'alts': []},
             {'from_row': 1, 'from_col': 4, 'to_row': 3, 'to_col': 4, 'eval': -30, 'alts': [
@@ -45,19 +47,25 @@ class Issue1630PredictionTest(TestCase):
 
     @patch('game.engine.ChessGame.get_ai_move')
     def test_no_prediction_in_pvp_or_normal_ai_mode(self, mock_get_ai_move):
-        session = self.client.session
-        self.game.mode = 'ai'
-        session['game'] = self.game.to_dict()
-        session['game']['mode'] = 'ai'
-        session.save()
-        
-        mock_get_ai_move.return_value = {'from_row': 1, 'from_col': 4, 'to_row': 3, 'to_col': 4, 'eval': 40, 'alts': []}
-        
-        response = self.client.post(reverse('ai_move'), content_type='application/json')
-        data = response.json()
-        
-        self.assertNotIn('predicted_responses', data.get('ai_move', {}))
-        self.assertEqual(mock_get_ai_move.call_count, 1)
+        for mode in ['ai', 'pvp']:
+            self.game.mode = mode
+            session = self.client.session
+            session['game'] = self.game.to_dict()
+            session.save()
+
+            mock_get_ai_move.return_value = {'from_row': 1, 'from_col': 4, 'to_row': 3, 'to_col': 4, 'eval': 40, 'alts': []}
+            mock_get_ai_move.reset_mock()
+
+            response = self.client.post(reverse('ai_move'), content_type='application/json')
+
+            if mode == 'ai':
+                self.assertEqual(response.status_code, 200)
+                data = response.json()
+                self.assertNotIn('predicted_responses', data.get('ai_move', {}))
+                self.assertEqual(mock_get_ai_move.call_count, 1)
+            else:
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(mock_get_ai_move.call_count, 0)
 
 class Issue1630EngineParserTest(TestCase):
     @patch('game.engine.ChessGame._call_engine')

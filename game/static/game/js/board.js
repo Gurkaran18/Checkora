@@ -2048,12 +2048,19 @@
                         };
 
                         const moveText = mv.notation || getSquareLabel(mv.to_row, mv.to_col);
-                        predSuggestedMove.innerHTML = `<strong>${moveText}</strong> ${formatEval(mv.eval)}`;
-                        
-                        predResponsesList.innerHTML = '';
+                        predSuggestedMove.textContent = '';
+                        const smStrong = document.createElement('strong');
+                        smStrong.textContent = moveText;
+                        predSuggestedMove.appendChild(smStrong);
+                        predSuggestedMove.appendChild(document.createTextNode(` ${formatEval(mv.eval)}`));
+
+                        predResponsesList.textContent = '';
                         data.ai_move.predicted_responses.forEach((resp, index) => {
                             const li = document.createElement('li');
-                            li.innerHTML = `<strong>${index + 1}. ${resp.notation}</strong> ${formatEval(resp.eval)}`;
+                            const respStrong = document.createElement('strong');
+                            respStrong.textContent = `${index + 1}. ${resp.notation}`;
+                            li.appendChild(respStrong);
+                            li.appendChild(document.createTextNode(` ${formatEval(resp.eval)}`));
                             li.style.marginBottom = '5px';
                             predResponsesList.appendChild(li);
                         });
