@@ -82,6 +82,45 @@
         renderSessionTracker(stats);
     }
 
+    /* ==========================================================
+    GAME COUNTER (Game #N badge — persists via sessionStorage,
+    resets automatically when the browser session ends)
+    ========================================================== */
+    const GAME_COUNTER_KEY = 'checkoraGameCounter';
+
+    function loadGameCounter() {
+        try {
+            const raw = sessionStorage.getItem(GAME_COUNTER_KEY);
+            const n = Number(raw);
+            return Number.isFinite(n) && n > 0 ? n : 0;
+        } catch (e) {
+            return 0;
+        }
+    }
+
+    function saveGameCounter(count) {
+        try {
+            sessionStorage.setItem(GAME_COUNTER_KEY, String(count));
+        } catch (e) {
+            // sessionStorage unavailable (e.g. private browsing) — fail silently
+        }
+    }
+
+    function renderGameCounter(count) {
+        const counterEl = document.getElementById('game-counter');
+        if (counterEl) counterEl.textContent = `Game #${count}`;
+    }
+
+    function updateGameCounterDisplay() {
+        renderGameCounter(loadGameCounter() || 1);
+    }
+
+    function incrementGameCounter() {
+        const count = loadGameCounter() + 1;
+        saveGameCounter(count);
+        renderGameCounter(count);
+    }
+
     let board = [];
     let turn = 'white';
     let selected = null;
@@ -3639,6 +3678,7 @@ function updateStepperUI() {
         gameOver = false;
         whiteAlertFired = false;
         blackAlertFired = false;
+        incrementGameCounter();
 
         gameStartTime = Date.now();
         
@@ -5298,6 +5338,8 @@ function updateStepperUI() {
 
     // Render any W/L/D counts already stored for this browser session
     updateSessionTracker();
+    // Render the current game count already stored for this browser session
+    updateGameCounterDisplay();
     // Resume game by clicking the paused board overlay
     boardEl.addEventListener('click', async () => {
         if (!paused) return;
