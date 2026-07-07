@@ -2276,8 +2276,15 @@
     }
 
 function renderStepperPosition(fen) {
+    if (!fen || typeof fen !== 'string') return;
+    if (fen.startsWith('startpos')) {
+        fen = DEFAULT_START_FEN;
+    }
     const position = fen.split(' ')[0];
     const rows = position.split('/');
+    if (rows.length !== 8) {
+        return;
+    }
     board = rows.map(row => {
         const expanded = [];
         for (const ch of row) {
