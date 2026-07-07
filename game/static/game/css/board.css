@@ -519,6 +519,20 @@ body {
 }
 
 /* ============================================================
+   Game Counter Badge (session game count — resets on tab close)
+   ============================================================ */
+.game-counter-badge {
+    display: block;
+    text-align: center;
+    width: fit-content;
+    margin: 0 auto 12px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    color: var(--text-secondary);
+}
+
+/* ============================================================
    Session Score Tracker (W/L/D — resets on sessionStorage clear)
    ============================================================ */
 .session-score-tracker {
@@ -3345,3 +3359,4 @@ body.blindfold-mode .capture-ring {
 
 .board-container.flipped .top-player { order: 4; }
 .board-container.flipped .bottom-player { order: 2; }
+
