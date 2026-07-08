@@ -3308,13 +3308,12 @@ body.blindfold-mode .capture-ring {
     grid-column: 1 / 2;
 }
 
-.sidebar-container > .controls-card {
+.sidebar-utility-column {
     grid-column: 2 / 3;
-}
-
-/* Tighten the space between the theme card and game controls card */
-.sidebar-container > .controls-card + .controls-card {
-    margin-top: -135px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-width: 0;
 }
 
 /* Make the Board Theme box more compact at the bottom */
@@ -3332,10 +3331,10 @@ body.blindfold-mode .capture-ring {
     padding-top: 8px;
 }
 
-/* Compact two-column control matrix */
+/* Compact single-column control stack */
 .controls-grid {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
 }
 
@@ -3398,9 +3397,15 @@ body.blindfold-mode .capture-ring {
     }
     .sidebar-container > .status-card,
     .sidebar-container > .move-history-card,
-    .sidebar-container > .controls-card,
     .sidebar-container > #emotePanel {
         grid-column: auto;
+    }
+    .sidebar-utility-column {
+        grid-column: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-width: 0;
     }
     .controls-grid {
         display: flex;
