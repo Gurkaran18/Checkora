@@ -633,7 +633,7 @@
     </div>
 
     <!-- ========== THEME & SETTINGS MODAL ========== -->
-    <div class="theme-settings-modal" id="themeSettingsModal" role="dialog" aria-modal="true" aria-labelledby="themeModalTitle" style="display: none;">
+    <div class="theme-settings-modal" id="themeSettingsModal" role="dialog" aria-modal="true" aria-labelledby="themeModalTitle">
         <div class="theme-modal-dialog">
             <button type="button" class="modal-close-btn" id="closeThemeModalBtn" aria-label="Close modal">&times;</button>
             <h2 class="theme-modal-title" id="themeModalTitle">⚙️ Theme & Settings</h2>
@@ -643,27 +643,27 @@
                 <div class="theme-swatches-grid">
                     <label class="theme-swatch-label">
                         <input type="radio" name="boardThemeRadio" value="classic" class="theme-radio-input">
-                        <span class="theme-swatch classic-swatch" title="Classic"></span>
+                        <span class="theme-swatch classic-swatch theme-btn" data-theme="classic" title="Classic"></span>
                         <span class="theme-swatch-name">Classic</span>
                     </label>
                     <label class="theme-swatch-label">
                         <input type="radio" name="boardThemeRadio" value="dark" class="theme-radio-input">
-                        <span class="theme-swatch dark-swatch" title="Dark"></span>
+                        <span class="theme-swatch dark-swatch theme-btn" data-theme="dark" title="Dark"></span>
                         <span class="theme-swatch-name">Dark</span>
                     </label>
                     <label class="theme-swatch-label">
                         <input type="radio" name="boardThemeRadio" value="green" class="theme-radio-input">
-                        <span class="theme-swatch green-swatch" title="Green"></span>
+                        <span class="theme-swatch green-swatch theme-btn" data-theme="green" title="Green"></span>
                         <span class="theme-swatch-name">Green</span>
                     </label>
                     <label class="theme-swatch-label">
                         <input type="radio" name="boardThemeRadio" value="blue" class="theme-radio-input">
-                        <span class="theme-swatch blue-swatch" title="Blue"></span>
+                        <span class="theme-swatch blue-swatch theme-btn" data-theme="blue" title="Blue"></span>
                         <span class="theme-swatch-name">Blue</span>
                     </label>
                     <label class="theme-swatch-label">
                         <input type="radio" name="boardThemeRadio" value="pastel" class="theme-radio-input">
-                        <span class="theme-swatch pastel-swatch" title="Pastel"></span>
+                        <span class="theme-swatch pastel-swatch theme-btn" data-theme="pastel" title="Pastel"></span>
                         <span class="theme-swatch-name">Pastel</span>
                     </label>
                 </div>
@@ -672,21 +672,21 @@
             <div class="theme-modal-section">
                 <h3 class="section-title">Preferences</h3>
                 <div class="pref-switch-row">
-                    <span class="pref-label">🔊 Sound Enabled</span>
+                    <label class="pref-label" for="modalSoundToggle">🔊 Sound Enabled</label>
                     <label class="switch-toggle">
                         <input type="checkbox" id="modalSoundToggle">
                         <span class="switch-slider"></span>
                     </label>
                 </div>
                 <div class="pref-switch-row">
-                    <span class="pref-label">🔢 Show Coordinates</span>
+                    <label class="pref-label" for="modalCoordsToggle">🔢 Show Coordinates</label>
                     <label class="switch-toggle">
                         <input type="checkbox" id="modalCoordsToggle">
                         <span class="switch-slider"></span>
                     </label>
                 </div>
                 <div class="pref-switch-row">
-                    <span class="pref-label">🔄 Auto-Flip Board</span>
+                    <label class="pref-label" for="modalAutoFlipToggle">🔄 Auto-Flip Board</label>
                     <label class="switch-toggle">
                         <input type="checkbox" id="modalAutoFlipToggle">
                         <span class="switch-slider"></span>

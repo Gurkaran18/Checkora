@@ -3466,6 +3466,11 @@ body.blindfold-mode .capture-ring {
     height: 0;
 }
 
+.theme-radio-input:focus-visible + .theme-swatch {
+    outline: 2px solid #f0c040;
+    outline-offset: 2px;
+}
+
 .theme-swatch {
     width: 42px;
     height: 42px;
@@ -3524,6 +3529,7 @@ body.blindfold-mode .capture-ring {
 .pref-label {
     font-size: 0.95rem;
     color: var(--text-primary);
+    cursor: pointer;
 }
 
 .switch-toggle {
@@ -3537,6 +3543,11 @@ body.blindfold-mode .capture-ring {
     opacity: 0;
     width: 0;
     height: 0;
+}
+
+.switch-toggle input:focus-visible + .switch-slider {
+    outline: 2px solid #f0c040;
+    outline-offset: 2px;
 }
 
 .switch-slider {
@@ -3566,4 +3577,35 @@ body.blindfold-mode .capture-ring {
 
 .switch-toggle input:checked + .switch-slider:before {
     transform: translateX(22px);
+}
+
+.theme-settings-modal .theme-btn {
+    border-radius: 8px !important;
+    opacity: 1 !important;
+    border: 2px solid rgba(255, 255, 255, 0.15) !important;
+    padding: 0 !important;
+    cursor: pointer;
+}
+
+/* Ensure conic gradients are not overridden by theme-btn solid colors */
+.theme-settings-modal .classic-swatch {
+    background-image: conic-gradient(#FFF6D5 0.25turn, #E1B12C 0.25turn 0.5turn, #FFF6D5 0.5turn 0.75turn, #E1B12C 0.75turn) !important;
+}
+.theme-settings-modal .dark-swatch {
+    background-image: conic-gradient(#b0b0b0 0.25turn, #3a3a3a 0.25turn 0.5turn, #b0b0b0 0.5turn 0.75turn, #3a3a3a 0.75turn) !important;
+}
+.theme-settings-modal .green-swatch {
+    background-image: conic-gradient(#9dbb94 0.25turn, #2e5a31 0.25turn 0.5turn, #9dbb94 0.5turn 0.75turn, #2e5a31 0.75turn) !important;
+}
+.theme-settings-modal .blue-swatch {
+    background-image: conic-gradient(#a4b1bd 0.25turn, #2e4a5a 0.25turn 0.5turn, #a4b1bd 0.5turn 0.75turn, #2e4a5a 0.75turn) !important;
+}
+.theme-settings-modal .pastel-swatch {
+    background-image: conic-gradient(#fff0f5 0.25turn, #ffb6c1 0.25turn 0.5turn, #fff0f5 0.5turn 0.75turn, #ffb6c1 0.75turn) !important;
+}
+
+.theme-radio-input:checked + .theme-swatch.theme-btn {
+    border-color: #f0c040 !important;
+    box-shadow: 0 0 12px rgba(240, 192, 64, 0.6) !important;
+    transform: scale(1.08) !important;
 }

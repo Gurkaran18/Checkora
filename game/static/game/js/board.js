@@ -526,7 +526,7 @@
 
     let playerColor = 'white';
     let flipped = false;
-    let autoFlip = false;
+    let autoFlip = localStorage.getItem('autoFlip') === 'true';
 
     const sounds = {
         move: new Audio(`${SOUND_BASE_URL}move.wav`),
@@ -4981,9 +4981,12 @@ function updateStepperUI() {
     const openThemeModalBtn = document.getElementById('openThemeModalBtn');
     const closeThemeModalBtn = document.getElementById('closeThemeModalBtn');
     const saveThemeSettingsBtn = document.getElementById('saveThemeSettingsBtn');
+    let themeModalFocusReturn = null;
 
     if (openThemeModalBtn && themeSettingsModal) {
         openThemeModalBtn.onclick = () => {
+            themeModalFocusReturn = document.activeElement;
+
             // 1. Sync Board Theme radio
             const currentBoardTheme = document.documentElement.getAttribute('data-board-theme') || 'classic';
             const boardThemeRadio = themeSettingsModal.querySelector(`input[name="boardThemeRadio"][value="${currentBoardTheme}"]`);
@@ -5005,6 +5008,13 @@ function updateStepperUI() {
             // Open the Modal
             themeSettingsModal.classList.add('active');
             themeSettingsModal.setAttribute('aria-hidden', 'false');
+
+            // Move focus to modal close button
+            setTimeout(() => {
+                if (closeThemeModalBtn) {
+                    closeThemeModalBtn.focus();
+                }
+            }, 50);
         };
     }
 
@@ -5012,13 +5022,31 @@ function updateStepperUI() {
         if (themeSettingsModal) {
             themeSettingsModal.classList.remove('active');
             themeSettingsModal.setAttribute('aria-hidden', 'true');
+            if (themeModalFocusReturn && typeof themeModalFocusReturn.focus === 'function') {
+                themeModalFocusReturn.focus();
+            }
+            themeModalFocusReturn = null;
         }
     };
 
     if (closeThemeModalBtn) closeThemeModalBtn.onclick = closeThemeModal;
     if (saveThemeSettingsBtn) saveThemeSettingsBtn.onclick = closeThemeModal;
 
+    // Handle Escape key to close modal
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && themeSettingsModal && themeSettingsModal.classList.contains('active')) {
+            closeThemeModal();
+        }
+    });
+
     if (themeSettingsModal) {
+        // Close modal on click outside (backdrop)
+        themeSettingsModal.addEventListener('click', (e) => {
+            if (e.target === themeSettingsModal) {
+                closeThemeModal();
+            }
+        });
+
         // Handle Board Theme swatch switches
         const boardRadios = themeSettingsModal.querySelectorAll('input[name="boardThemeRadio"]');
         boardRadios.forEach(radio => {
@@ -5078,6 +5106,7 @@ function updateStepperUI() {
         if (autoFlipToggle) {
             autoFlipToggle.addEventListener('change', () => {
                 autoFlip = autoFlipToggle.checked;
+                localStorage.setItem('autoFlip', String(autoFlip));
                 if (autoFlipBtn) {
                     autoFlipBtn.textContent = 'Auto-Flip: ' + (autoFlip ? 'ON' : 'OFF');
                     autoFlipBtn.style.background = autoFlip ? 'linear-gradient(135deg, #40c0f0, #2080d4)' : '';
