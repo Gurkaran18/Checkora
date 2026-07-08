@@ -2514,7 +2514,10 @@ def analyze_game_view(request):
         game = ChessGame()
         game.white_time = 10 ** 9
         game.black_time = 10 ** 9
-        
+
+        # Timeout handling for complex endgame analysis
+        ANALYSIS_TIMEOUT_SECONDS = getattr(settings, 'ANALYSIS_TIMEOUT_SECONDS', 10)
+
         analyzed_moves_count = 0
         for idx, notation in enumerate(moves[:80]): # Cap at 80 for perf
             move_num = idx // 2 + 1
@@ -2569,7 +2572,7 @@ def analyze_game_view(request):
                 is_best = (best_move['from_row'] == actual_from[0] and best_move['from_col'] == actual_from[1] and best_move['to_row'] == actual_to[0] and best_move['to_col'] == actual_to[1])
             else:
                 is_best = True
-                
+
             move_class = _classify_move(is_best, played_dict, best_move, game)
             if move_class == 'Blunder':
                 blunders += 1
@@ -2592,15 +2595,20 @@ def analyze_game_view(request):
         accuracy = round(((analyzed_moves_count - bad_moves) / analyzed_moves_count) * 100) if analyzed_moves_count > 0 else 100
         opening = detect_opening(moves) or 'Unknown'
 
-        return JsonResponse({
+        response_data = {
             'result': result,
             'end_reason': reason,
             'opening': opening,
             'captures': captures, 'checks': checks, 'checkmates': checkmates,
-            'promotions': promotions, 'blunders': blunders, 'mistakes': mistakes, 
+            'promotions': promotions, 'blunders': blunders, 'mistakes': mistakes,
             'accuracy': accuracy, 'total_moves': (len(moves) + 1) // 2, 'move_analysis_details': move_analysis_details,
             'move_analysis': [detail['class'] for detail in move_analysis_details],
-        })
+            'analysis_timeout_seconds': ANALYSIS_TIMEOUT_SECONDS
+        }
+
+        response = JsonResponse(response_data)
+        response['X-Analysis-Timeout'] = str(ANALYSIS_TIMEOUT_SECONDS)
+        return response
     except Exception as e:
         logger.error('Failed to analyze game: %s', e)
         return JsonResponse({'error': 'Failed to analyze game'}, status=400)
