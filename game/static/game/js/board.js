@@ -1886,7 +1886,17 @@
                                         const streak = updatePuzzleStreak();
                                         updateStreakDisplay();
                                         if (data.game_status === 'checkmate') {
-                                            endGame('checkmate', turn).catch(e => console.error("Error in endGame:", e));
+                                            lastMove = { from: [fr, fc], to: [tr, tc] };
+                                            whiteTime = data.white_time;
+                                            blackTime = data.black_time;
+                                            updatePlayerNames(data);
+                                            updateTurn();
+                                            updateMoves(data.move_history);
+                                            updateCaptured(data.captured_pieces);
+                                            syncPieces();
+                                            renderClocks();
+                                            updateMaterialUI(board);
+                                            return endGame('checkmate', turn).catch(e => console.error("Error in endGame:", e));
                                         } else {
                                             showConfirm(
                                                 "🎉 Puzzle Solved!",
@@ -3091,6 +3101,9 @@ function updateStepperUI() {
 
         } catch (error) {
             console.error("Error during endGame setup:", error);
+            if (!title) title = 'Game Over';
+            if (!message) message = 'The game has ended.';
+            isCelebration = false;
         }
 
         // Delay the overlay and celebration effects by 0.5 seconds
