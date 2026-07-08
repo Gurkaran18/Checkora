@@ -1848,18 +1848,22 @@
 
                             const streak = updatePuzzleStreak();
                             updateStreakDisplay();
-                            showConfirm(
-                                "🎉 Puzzle Solved!",
-                                `🔥 Current Streak: ${streak}<br> 
-                                                    🏆 Best Streak: ${getPuzzleStreak().longestStreak}<br>
-                                                    Come back tomorrow for a new challenge.`,
-                                () => {
-                                    gameLayout.style.visibility = "hidden";
-                                    welcomeOverlay.classList.add("active");
-                                },
-                                "#f0c040"
-                            );
-                            return;
+                            if (data.game_status === 'checkmate') {
+                                // Transition to standard game-over overlay for checkmates
+                            } else {
+                                showConfirm(
+                                    "🎉 Puzzle Solved!",
+                                    `🔥 Current Streak: ${streak}<br> 
+                                                        🏆 Best Streak: ${getPuzzleStreak().longestStreak}<br>
+                                                        Come back tomorrow for a new challenge.`,
+                                    () => {
+                                        gameLayout.style.visibility = "hidden";
+                                        welcomeOverlay.classList.add("active");
+                                    },
+                                    "#f0c040"
+                                );
+                                return;
+                            }
                         }
                     } else {
                         // Start Stockfish validation for alternative moves
@@ -1881,17 +1885,21 @@
                                     if (puzzleMoveIndex >= currentPuzzle.solution.length) {
                                         const streak = updatePuzzleStreak();
                                         updateStreakDisplay();
-                                        showConfirm(
-                                            "🎉 Puzzle Solved!",
-                                            `🔥 Current Streak: ${streak}<br> 
-                                                                🏆 Best Streak: ${getPuzzleStreak().longestStreak}<br>
-                                                                Come back tomorrow for a new challenge.`,
-                                            () => {
-                                                gameLayout.style.visibility = "hidden";
-                                                welcomeOverlay.classList.add("active");
-                                            },
-                                            "#f0c040"
-                                        );
+                                        if (data.game_status === 'checkmate') {
+                                            endGame('checkmate', turn).catch(e => console.error("Error in endGame:", e));
+                                        } else {
+                                            showConfirm(
+                                                "🎉 Puzzle Solved!",
+                                                `🔥 Current Streak: ${streak}<br> 
+                                                                    🏆 Best Streak: ${getPuzzleStreak().longestStreak}<br>
+                                                                    Come back tomorrow for a new challenge.`,
+                                                () => {
+                                                    gameLayout.style.visibility = "hidden";
+                                                    welcomeOverlay.classList.add("active");
+                                                },
+                                                "#f0c040"
+                                            );
+                                        }
                                     }
                                 } else {
                                     showConfirm(
@@ -2548,7 +2556,7 @@ function updateStepperUI() {
     }
 
     function handleGameStatus(status, drawReason) {
-        if (dailyPuzzleMode) {
+        if (dailyPuzzleMode && status !== 'checkmate') {
             return false;
         }
         if (status === 'checkmate') {
@@ -2718,8 +2726,9 @@ function updateStepperUI() {
             }
         }
 
-        if (gameOverMessage) {
-            gameOverMessage.textContent = message;
+        const messageEl = gameOverMessage || document.getElementById('gameOverMessage');
+        if (messageEl) {
+            messageEl.textContent = message;
         }
 
         // 2. Result Illustration injection
@@ -3086,24 +3095,25 @@ function updateStepperUI() {
 
         // Delay the overlay and celebration effects by 0.5 seconds
         setTimeout(() => {
-            if (!gameOverOverlay) return;
+            const overlayEl = gameOverOverlay || document.getElementById('gameOverOverlay');
+            if (!overlayEl) return;
             // Add celebration effects for wins
             if (isCelebration) {
-                gameOverOverlay.classList.add('game-over-celebration');
+                overlayEl.classList.add('game-over-celebration');
                 createConfetti();
                 createSparkles();
             } else {
-                gameOverOverlay.classList.remove('game-over-celebration');
+                overlayEl.classList.remove('game-over-celebration');
             }
 
             // Prepare for fade-in animation
-            gameOverOverlay.style.transition = 'opacity 0.5s ease-in-out';
-            gameOverOverlay.style.opacity = '0';
-            gameOverOverlay.classList.add('active');
+            overlayEl.style.transition = 'opacity 0.5s ease-in-out';
+            overlayEl.style.opacity = '0';
+            overlayEl.classList.add('active');
 
             // Trigger fade-in after a short delay
             setTimeout(() => {
-                if (gameOverOverlay) gameOverOverlay.style.opacity = '1';
+                if (overlayEl) overlayEl.style.opacity = '1';
             }, 500);
         }, 500);
 
