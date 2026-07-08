@@ -452,6 +452,7 @@ class AiMoveRateLimitTest(TestCase):
 
         r = self.client.post(reverse('ai_move'), REMOTE_ADDR='192.0.2.1', HTTP_ACCEPT='application/json')
         self.assertEqual(r.status_code, 429)
+        self.assertEqual(r['Retry-After'], '60')
         self.assertIn('error', r.json())
 
     @override_settings(
@@ -460,13 +461,14 @@ class AiMoveRateLimitTest(TestCase):
         AI_MOVE_IP_MAX_REQUESTS=1000,
     )
     def test_429_response_is_json_with_error_key(self):
-        """The throttled response must be JSON with an 'error' key."""
+        """The throttled response must be JSON with an 'error' key and a Retry-After header."""
         self.client.force_login(self.user1)
         self._make_ai_game_session()
 
         self.client.post(reverse('ai_move'), HTTP_ACCEPT='application/json')
         r = self.client.post(reverse('ai_move'), HTTP_ACCEPT='application/json')
         self.assertEqual(r.status_code, 429)
+        self.assertEqual(r['Retry-After'], '60')
         data = r.json()
         self.assertIn('error', data)
         self.assertIsInstance(data['error'], str)

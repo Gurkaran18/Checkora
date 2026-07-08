@@ -591,18 +591,22 @@ def ai_move(request):
     ip_key = get_ai_move_rate_ip_key(ip)
     ip_count = increment_counter(ip_key, timeout=window)
     if ip_count > getattr(settings, 'AI_MOVE_IP_MAX_REQUESTS', 240):
-        return JsonResponse(
+        response = JsonResponse(
             {'error': 'Too many AI move requests. Please try again shortly.'},
             status=429,
         )
+        response['Retry-After'] = str(window)
+        return response
     if request.user.is_authenticated:
         user_key = get_ai_move_rate_user_key(request.user.id)
         user_count = increment_counter(user_key, timeout=window)
         if user_count > getattr(settings, 'AI_MOVE_USER_MAX_REQUESTS', 120):
-            return JsonResponse(
+            response = JsonResponse(
                 {'error': 'Too many AI move requests. Please try again shortly.'},
                 status=429,
             )
+            response['Retry-After'] = str(window)
+            return response
 
     game_data = request.session.get('game')
     if not game_data:
