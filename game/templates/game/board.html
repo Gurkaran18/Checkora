@@ -513,7 +513,7 @@
                 </div>
             </div>
 
-            <div class="card controls-card">
+            <div class="card controls-card theme-card">
                 <div class="card-title">Board Theme</div>
                 <div class="theme-switcher">
                     <div class="theme-option">
@@ -545,7 +545,7 @@
 
             <div class="card controls-card">
                 <div class="card-title">Game Controls</div>
-                <div style="display: flex; flex-direction: column; gap: 8px;">
+                <div class="controls-grid">
                     <button type="button" class="btn btn-gold" id="flipBtn" title="Shortcut: F">Flip Board<span class="btn-shortcut">F</span></button>
                     <button type="button" class="btn btn-gold" id="blindfoldBtn">Blindfold: OFF</button>
                     <button class="btn btn-gold" id="newPvPBtn">Pass & Play (PvP)</button>
@@ -558,15 +558,15 @@
                     <button class="btn btn-gold" id="muteBtn" type="button" aria-pressed="true">🔊 Sound On</button>
                     <button class="btn btn-gold" id="newFenBtn">Load Game</button>
                     <button class="btn btn-gold" id="copyPgnBtn">Export as PGN</button>
-                    <div id="flipControls" style="display: flex; flex-direction: column; gap: 8px;">
+                    <div id="flipControls" class="controls-grid-full">
                         <button class="btn btn-gold" id="autoFlipBtn">Auto-Flip: OFF</button>
                     </div>
                     <button type="button" class="btn btn-gold" id="drawBtn" title="Shortcut: D">Offer Draw<span class="btn-shortcut">D</span></button>
                     <button type="button" class="btn btn-warning" id="pauseBtn" title="Shortcut: P">Pause<span class="btn-shortcut">P</span></button>
                     <button type="button" class="btn btn-danger" id="resignBtn" title="Shortcut: R">Resign<span class="btn-shortcut">R</span></button>
-                    <button type="button" class="btn btn-gold" style="width: 100%;" onclick="document.getElementById('rulebookModal').style.display='flex'">📖 Rulebook</button>
+                    <button type="button" class="btn btn-gold controls-grid-full" onclick="document.getElementById('rulebookModal').style.display='flex'">📖 Rulebook</button>
                 </div>
-                <a href="/" class="btn" style="background: #2a1414; color: #ff6b6b;margin-top: 1rem;margin-bottom: 1.5rem; border: 1px solid #632424; text-decoration: none; text-align: center; display: block; line-height: 2.5;">EXIT TO HOME</a>
+                <a href="/" class="btn controls-grid-full" style="background: #2a1414; color: #ff6b6b;margin-top: 1rem;margin-bottom: 1.5rem; border: 1px solid #632424; text-decoration: none; text-align: center; display: block; line-height: 2.5;">EXIT TO HOME</a>
             </div>
 
             <div class="card" id="emotePanel" style="display: none;">

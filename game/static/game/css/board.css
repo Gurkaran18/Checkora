@@ -751,7 +751,7 @@ body {
     --layout-padding-x: clamp(10px, 1.5vw, 20px);
     --layout-padding-y: clamp(12px, 1.5vw, 20px);
     --panel-width: clamp(128px, 11vw, 196px);
-    --sidebar-width: 360px;
+    --sidebar-width: clamp(360px, 28vw, 440px);
     --rank-label-width: 1.35rem;
     --board-border: 3px;
     --board-chrome: calc(var(--rank-label-width) + var(--board-border) * 2 + 12px);
@@ -3287,20 +3287,82 @@ body.blindfold-mode .capture-ring {
 .sidebar-container {
     width: 100%;
     min-width: 0;
-    max-width: var(--panel-width);
-    display: flex;
-    flex-direction: column;
+    max-width: none;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 12px;
     box-sizing: border-box;
+    align-content: start;
+}
+
+.sidebar-container > .card {
+    min-width: 0;
+}
+
+.sidebar-container > .status-card,
+.sidebar-container > #emotePanel {
+    grid-column: 1 / -1;
+}
+
+.sidebar-container > .move-history-card {
+    grid-column: 1 / 2;
+}
+
+.sidebar-container > .controls-card {
+    grid-column: 2 / 3;
+}
+
+/* Tighten the space between the theme card and game controls card */
+.sidebar-container > .controls-card + .controls-card {
+    margin-top: -135px;
+}
+
+/* Make the Board Theme box more compact at the bottom */
+.theme-card {
+    padding-bottom: 8px;
+    align-self: start;
+}
+
+.theme-card .theme-switcher {
+    margin-top: 6px;
+}
+
+.theme-card .preference-container {
+    margin-top: 8px;
+    padding-top: 8px;
+}
+
+/* Compact two-column control matrix */
+.controls-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+}
+
+.controls-grid > * {
+    width: 100%;
+    min-width: 0;
+}
+
+.controls-grid .btn {
+    min-height: 42px;
+    padding: 8px 10px;
+    font-size: 0.78rem;
+    line-height: 1.15;
+    text-align: center;
+}
+
+.controls-grid-full {
+    grid-column: 1 / -1;
 }
 
 @media (max-width: 1024px) {
     .sidebar-container {
-        max-width: 500px;
-        flex-direction: row;
-        flex-wrap: wrap;
+        gap: 10px;
     }
-    .sidebar-container .card { flex: 1; min-width: 200px; }
+    .controls-grid {
+        gap: 6px;
+    }
 }
 
 .mobile-close-btn {
@@ -3334,6 +3396,20 @@ body.blindfold-mode .capture-ring {
         width: 100% !important;
         min-width: 0 !important;
     }
+    .sidebar-container > .status-card,
+    .sidebar-container > .move-history-card,
+    .sidebar-container > .controls-card,
+    .sidebar-container > #emotePanel {
+        grid-column: auto;
+    }
+    .controls-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .controls-grid-full {
+        grid-column: auto;
+    }
     .sidebar-container.active {
         right: 0;
     }
@@ -3358,6 +3434,7 @@ body.blindfold-mode .capture-ring {
     flex-direction: column;
     overflow: hidden;
     min-height: 0;
+    min-height: 260px;
 }
 
 .move-history-card .moves-list {
