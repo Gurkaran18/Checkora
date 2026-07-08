@@ -582,6 +582,28 @@ def set_pause(request):
 @require_POST
 def ai_move(request):
     """Let the engine compute and play the best move for the current side."""
+    # Issue #1625: Rate-limit this endpoint to prevent computational DoS.
+    # Apply both a per-user limit (for authenticated sessions) and a per-IP
+    # limit (for anonymous or shared-IP scenarios), matching the pattern used
+    # in analyze_game_view.
+    window = getattr(settings, 'AI_MOVE_RATE_WINDOW_SECONDS', 60)
+    ip = get_client_ip(request)
+    ip_key = get_ai_move_rate_ip_key(ip)
+    ip_count = increment_counter(ip_key, timeout=window)
+    if ip_count > getattr(settings, 'AI_MOVE_IP_MAX_REQUESTS', 240):
+        return JsonResponse(
+            {'error': 'Too many AI move requests. Please try again shortly.'},
+            status=429,
+        )
+    if request.user.is_authenticated:
+        user_key = get_ai_move_rate_user_key(request.user.id)
+        user_count = increment_counter(user_key, timeout=window)
+        if user_count > getattr(settings, 'AI_MOVE_USER_MAX_REQUESTS', 120):
+            return JsonResponse(
+                {'error': 'Too many AI move requests. Please try again shortly.'},
+                status=429,
+            )
+
     game_data = request.session.get('game')
     if not game_data:
         err_msg = 'No active game.'
@@ -1520,6 +1542,17 @@ def _is_trusted_proxy(ip_text, trusted_entries):
             continue
     return False
 
+
+def get_ai_move_rate_user_key(user_id):
+    """Get the cache key for per-user AI move rate limiting."""
+    digest = hashlib.sha256(str(user_id).encode('utf-8')).hexdigest()
+    return f'ai_move_rate:user:{digest}'
+
+
+def get_ai_move_rate_ip_key(ip):
+    """Get the cache key for per-IP AI move rate limiting."""
+    digest = hashlib.sha256(ip.encode('utf-8')).hexdigest()
+    return f'ai_move_rate:ip:{digest}'
 
 def get_client_ip(request):
     """Get client IP address safely by parsing trusted proxies."""
