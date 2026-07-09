@@ -407,6 +407,74 @@ class PasswordResetRateLimitTest(TestCase):
         )
         self.assertEqual(view._client_ip(request), '203.0.113.195')
 
+    def test_password_reset_public_responses_are_indistinguishable(self):
+        """Verify that unknown, single-account, and multi-account submissions
+
+        produce identical public-facing responses (status, redirects, and HTML content)
+        while sending different emails privately.
+        """
+        # Case 1: Unknown email
+        cache.clear()
+        mail.outbox = []
+        response_unknown = self.client.post(
+            self.reset_url,
+            data={'email': 'unknown@example.com'},
+            follow=True,
+        )
+        self.assertEqual(len(mail.outbox), 0)
+
+        # Case 2: Single eligible account
+        cache.clear()
+        mail.outbox = []
+        response_single = self.client.post(
+            self.reset_url,
+            data={'email': 'reset@example.com'},
+            follow=True,
+        )
+        self.assertEqual(len(mail.outbox), 1)
+
+        # Case 3: Multiple eligible accounts sharing the email
+        cache.clear()
+        mail.outbox = []
+        User.objects.create_user(
+            username='resetplayer2',
+            email='reset@example.com',
+            password='StrongPass1234!',  # noqa: S106
+        )
+        response_multi = self.client.post(
+            self.reset_url,
+            data={'email': 'reset@example.com'},
+            follow=True,
+        )
+        self.assertEqual(len(mail.outbox), 2)
+
+        # 1. Compare status codes (all should be 200 after following redirects)
+        self.assertEqual(response_unknown.status_code, 200)
+        self.assertEqual(response_single.status_code, 200)
+        self.assertEqual(response_multi.status_code, 200)
+
+        # 2. Compare redirect chains
+        self.assertEqual(response_unknown.redirect_chain, response_single.redirect_chain)
+        self.assertEqual(response_single.redirect_chain, response_multi.redirect_chain)
+        self.assertEqual(response_unknown.redirect_chain, [(self.done_url, 302)])
+
+        # 3. Compare final HTML content (must be identical)
+        self.assertEqual(response_unknown.content, response_single.content)
+        self.assertEqual(response_single.content, response_multi.content)
+
+        # 4. Verify no account identifiers or selection UIs are leaked in the public HTML
+        for response in [response_unknown, response_single, response_multi]:
+            self.assertNotContains(response, 'Select Your Account')
+            self.assertNotContains(response, 'resetplayer')
+            self.assertNotContains(response, 'resetplayer2')
+            self.assertNotContains(response, 'usernames')
+
+    def test_account_selection_endpoint_is_removed(self):
+        # Verify that the account selection endpoint returns 404
+        url = '/password-reset-account-selection/'
+        response = self.client.get(url, {'email': 'reset@example.com'})
+        self.assertEqual(response.status_code, 404)
+
 
 class MoveValidationTest(TestCase):
     """Test move validation wrapper by mocking validate_move."""
