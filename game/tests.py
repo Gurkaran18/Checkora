@@ -11,6 +11,8 @@ from game.models import (
     ActiveGame,
     OpeningProgress,
     UserProgress,
+    Discussion,
+    DiscussionBookmark,
 )
 
 from django.conf import settings
@@ -3918,3 +3920,58 @@ class OpeningStatsTests(TestCase):
 
         # XP should not increase after the second completion
         self.assertEqual(user_progress.xp, 75)
+
+
+class DiscussionBookmarkRedirectTests(TestCase):
+    """Tests for safe redirection in toggle_discussion_bookmark view."""
+
+    def setUp(self):
+        super().setUp()
+        self.user = User.objects.create_user(
+            username='bookmark_user',
+            password='TestPass123!',
+            email='bookmark@example.com'
+        )
+        self.client.login(username='bookmark_user', password='TestPass123!')
+        self.discussion = Discussion.objects.create(
+            user=self.user,
+            title='Test Discussion',
+            content='This is a test discussion'
+        )
+        self.url = reverse('toggle_discussion_bookmark', kwargs={'discussion_id': self.discussion.id})
+
+    def test_safe_local_path_next(self):
+        response = self.client.post(self.url, {'next': '/forum/'})
+        self.assertRedirects(response, '/forum/', fetch_redirect_response=False)
+
+    def test_safe_same_host_url_next(self):
+        response = self.client.post(self.url, {'next': 'http://testserver/forum/'})
+        self.assertRedirects(response, 'http://testserver/forum/', fetch_redirect_response=False)
+
+    def test_unsafe_external_url_next_falls_back_to_forum(self):
+        response = self.client.post(self.url, {'next': 'http://evil.com/external'})
+        self.assertRedirects(response, reverse('forum'), fetch_redirect_response=False)
+
+    def test_unsafe_protocol_relative_url_next_falls_back_to_forum(self):
+        response = self.client.post(self.url, {'next': '//evil.com/external'})
+        self.assertRedirects(response, reverse('forum'), fetch_redirect_response=False)
+
+    def test_safe_referer_fallback(self):
+        response = self.client.post(self.url, HTTP_REFERER='http://testserver/forum/1/')
+        self.assertRedirects(response, 'http://testserver/forum/1/', fetch_redirect_response=False)
+
+    def test_unsafe_referer_fallback_redirects_to_forum(self):
+        response = self.client.post(self.url, HTTP_REFERER='http://evil.com/external')
+        self.assertRedirects(response, reverse('forum'), fetch_redirect_response=False)
+
+    def test_unsafe_next_and_safe_referer_falls_back_to_referer(self):
+        response = self.client.post(
+            self.url,
+            {'next': 'http://evil.com/external'},
+            HTTP_REFERER='http://testserver/forum/1/'
+        )
+        self.assertRedirects(response, 'http://testserver/forum/1/', fetch_redirect_response=False)
+
+    def test_no_next_and_no_referer_fallback(self):
+        response = self.client.post(self.url)
+        self.assertRedirects(response, reverse('forum'), fetch_redirect_response=False)
