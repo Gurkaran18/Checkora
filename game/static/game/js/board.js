@@ -1848,18 +1848,22 @@
 
                             const streak = updatePuzzleStreak();
                             updateStreakDisplay();
-                            showConfirm(
-                                "🎉 Puzzle Solved!",
-                                `🔥 Current Streak: ${streak}<br> 
-                                                    🏆 Best Streak: ${getPuzzleStreak().longestStreak}<br>
-                                                    Come back tomorrow for a new challenge.`,
-                                () => {
-                                    gameLayout.style.visibility = "hidden";
-                                    welcomeOverlay.classList.add("active");
-                                },
-                                "#f0c040"
-                            );
-                            return;
+                            if (data.game_status === 'checkmate') {
+                                // Transition to standard game-over overlay for checkmates
+                            } else {
+                                showConfirm(
+                                    "🎉 Puzzle Solved!",
+                                    `🔥 Current Streak: ${streak}<br> 
+                                                        🏆 Best Streak: ${getPuzzleStreak().longestStreak}<br>
+                                                        Come back tomorrow for a new challenge.`,
+                                    () => {
+                                        gameLayout.style.visibility = "hidden";
+                                        welcomeOverlay.classList.add("active");
+                                    },
+                                    "#f0c040"
+                                );
+                                return;
+                            }
                         }
                     } else {
                         // Start Stockfish validation for alternative moves
@@ -1881,17 +1885,31 @@
                                     if (puzzleMoveIndex >= currentPuzzle.solution.length) {
                                         const streak = updatePuzzleStreak();
                                         updateStreakDisplay();
-                                        showConfirm(
-                                            "🎉 Puzzle Solved!",
-                                            `🔥 Current Streak: ${streak}<br> 
-                                                                🏆 Best Streak: ${getPuzzleStreak().longestStreak}<br>
-                                                                Come back tomorrow for a new challenge.`,
-                                            () => {
-                                                gameLayout.style.visibility = "hidden";
-                                                welcomeOverlay.classList.add("active");
-                                            },
-                                            "#f0c040"
-                                        );
+                                        if (data.game_status === 'checkmate') {
+                                            lastMove = { from: [fr, fc], to: [tr, tc] };
+                                            whiteTime = data.white_time;
+                                            blackTime = data.black_time;
+                                            updatePlayerNames(data);
+                                            updateTurn();
+                                            updateMoves(data.move_history);
+                                            updateCaptured(data.captured_pieces);
+                                            syncPieces();
+                                            renderClocks();
+                                            updateMaterialUI(board);
+                                            return endGame('checkmate', turn).catch(e => console.error("Error in endGame:", e));
+                                        } else {
+                                            showConfirm(
+                                                "🎉 Puzzle Solved!",
+                                                `🔥 Current Streak: ${streak}<br> 
+                                                                    🏆 Best Streak: ${getPuzzleStreak().longestStreak}<br>
+                                                                    Come back tomorrow for a new challenge.`,
+                                                () => {
+                                                    gameLayout.style.visibility = "hidden";
+                                                    welcomeOverlay.classList.add("active");
+                                                },
+                                                "#f0c040"
+                                            );
+                                        }
                                     }
                                 } else {
                                     showConfirm(
@@ -2548,31 +2566,39 @@ function updateStepperUI() {
     }
 
     function handleGameStatus(status, drawReason) {
-        if (dailyPuzzleMode) {
+        if (dailyPuzzleMode && status !== 'checkmate') {
             return false;
         }
         if (status === 'checkmate') {
-            endGame('checkmate', turn);
+            // pass 'turn' as the loserColor since the current turn's player got checkmated
+            endGame('checkmate', turn).catch(e => console.error("Error in endGame:", e));
             return true;
         }
         if (status === 'stalemate') {
-            endGame('stalemate', turn);
+            // pass 'turn' as the loserColor (unused for stalemate winner derivation)
+            endGame('stalemate', turn).catch(e => console.error("Error in endGame:", e));
             return true;
         }
         if (status === 'draw') {
-            endGame('draw', turn, drawReason);
+            endGame('draw', turn, drawReason).catch(e => console.error("Error in endGame:", e));
             return true;
         }
         return false;
     }
 
-    async function endGame(reason, color, drawReason = null) {
+    // loserColor always represents the losing side. Unused for winner derivation in draw/stalemate.
+    async function endGame(reason, loserColor, drawReason = null) {
         if (gameOver) return;
         gameOver = true;
-        const frozenPlayerColor = playerColor;
-        replayMode = true;
-        paused = true;
-        clearInterval(timerInterval);
+        
+        let title = '', message = '';
+        let isCelebration = false;
+
+        try {
+            const frozenPlayerColor = playerColor;
+            replayMode = true;
+            paused = true;
+            clearInterval(timerInterval);
 
         if (blindfoldMode) {
             blindfoldMode = false;
@@ -2582,11 +2608,11 @@ function updateStepperUI() {
         }
         updateThinkingDots();
 
-        let title = '', message = '';
+        title = ''; message = '';
 
         // Determine PVP or AI result relative to current player color
         const isWon = reason === 'checkmate' || reason === 'resign' || reason === 'timeout';
-        const winnerColor = isWon ? (color === 'white' ? 'black' : 'white') : null;
+        const winnerColor = isWon ? (loserColor === 'white' ? 'black' : 'white') : null;
 
         let resultState = 'draw'; // 'victory', 'defeat', 'draw'
         if (isWon) {
@@ -2597,7 +2623,7 @@ function updateStepperUI() {
             }
         }
 
-        let isCelebration = (resultState === 'victory');
+        isCelebration = (resultState === 'victory');
 
         // Update the session W/L/D tracker for this completed game
         if (gameMode === 'ai' || reason === 'draw' || reason === 'stalemate') {
@@ -2608,7 +2634,7 @@ function updateStepperUI() {
         playGameOverSound(reason, resultState);
 
         if (reason === 'checkmate') {
-            const winnerName = color === 'white' ? blackNameLabel.textContent : whiteNameLabel.textContent;
+            const winnerName = loserColor === 'white' ? (blackNameLabel?.textContent || 'Black') : (whiteNameLabel?.textContent || 'White');
             title = 'Checkmate';
             message = `${winnerName} Wins!`;
         } else if (reason === 'stalemate') {
@@ -2624,13 +2650,13 @@ function updateStepperUI() {
             };
             message = drawMessages[drawReason] || 'The game is a draw.';
         } else if (reason === 'resign') {
-            const winnerName = color === 'white' ? blackNameLabel.textContent : whiteNameLabel.textContent;
-            const loserName = color === 'white' ? whiteNameLabel.textContent : blackNameLabel.textContent;
+            const winnerName = loserColor === 'white' ? (blackNameLabel?.textContent || 'Black') : (whiteNameLabel?.textContent || 'White');
+            const loserName = loserColor === 'white' ? (whiteNameLabel?.textContent || 'White') : (blackNameLabel?.textContent || 'Black');
             title = 'Victory';
             message = `${loserName} resigned. ${winnerName} Wins!`;
         } else if (reason === 'timeout') {
-            const winnerName = color === 'white' ? blackNameLabel.textContent : whiteNameLabel.textContent;
-            const loserName = color === 'white' ? whiteNameLabel.textContent : blackNameLabel.textContent;
+            const winnerName = loserColor === 'white' ? (blackNameLabel?.textContent || 'Black') : (whiteNameLabel?.textContent || 'White');
+            const loserName = loserColor === 'white' ? (whiteNameLabel?.textContent || 'White') : (blackNameLabel?.textContent || 'Black');
             title = 'Timeout';
             message = `${loserName} ran out of time. ${winnerName} Wins!`;
         }
@@ -2710,7 +2736,10 @@ function updateStepperUI() {
             }
         }
 
-        gameOverMessage.textContent = message;
+        const messageEl = gameOverMessage || document.getElementById('gameOverMessage');
+        if (messageEl) {
+            messageEl.textContent = message;
+        }
 
         // 2. Result Illustration injection
         const illustrationEl = document.getElementById('gameOverIllustration');
@@ -3070,41 +3099,49 @@ function updateStepperUI() {
             console.error("Failed to fetch post-game analysis", e);
         });
 
+        } catch (error) {
+            console.error("Error during endGame setup:", error);
+            if (!title) title = 'Game Over';
+            if (!message) message = 'The game has ended.';
+            isCelebration = false;
+        }
 
         // Delay the overlay and celebration effects by 0.5 seconds
         setTimeout(() => {
+            const overlayEl = gameOverOverlay || document.getElementById('gameOverOverlay');
+            if (!overlayEl) return;
             // Add celebration effects for wins
             if (isCelebration) {
-                gameOverOverlay.classList.add('game-over-celebration');
+                overlayEl.classList.add('game-over-celebration');
                 createConfetti();
                 createSparkles();
             } else {
-                gameOverOverlay.classList.remove('game-over-celebration');
+                overlayEl.classList.remove('game-over-celebration');
             }
 
             // Prepare for fade-in animation
-            gameOverOverlay.style.transition = 'opacity 0.5s ease-in-out';
-            gameOverOverlay.style.opacity = '0';
-            gameOverOverlay.classList.add('active');
+            overlayEl.style.transition = 'opacity 0.5s ease-in-out';
+            overlayEl.style.opacity = '0';
+            overlayEl.classList.add('active');
 
             // Trigger fade-in after a short delay
             setTimeout(() => {
-                gameOverOverlay.style.opacity = '1';
+                if (overlayEl) overlayEl.style.opacity = '1';
             }, 500);
         }, 500);
 
         showStatus(title + ': ' + message, false);
 
         // Clean a11y announcement
-        const winnerColorText = color === 'white' ? 'Black' : 'White';
+        const winnerColorText = loserColor === 'white' ? 'Black' : 'White';
         let cleanMsg = '';
         if (reason === 'checkmate') {
             cleanMsg = `Checkmate. ${winnerColorText} wins!`;
         } else if (reason === 'resign') {
-            const resigningColorText = color === 'white' ? 'White' : 'Black';
+            const resigningColorText = loserColor === 'white' ? 'White' : 'Black';
             cleanMsg = `${resigningColorText} has resigned. ${winnerColorText} wins!`;
         } else if (reason === 'timeout') {
-            const timeoutColorText = color === 'white' ? 'White' : 'Black';
+            const timeoutColorText = loserColor === 'white' ? 'White' : 'Black';
             cleanMsg = `${timeoutColorText} ran out of time. ${winnerColorText} wins!`;
         } else if (reason === 'stalemate') {
             cleanMsg = 'Game drawn by stalemate.';
