@@ -1519,17 +1519,6 @@ class CustomPasswordResetView(PasswordResetView):
         else:
             cache.set(ip_expires_key, time.time() + ip_timeout, timeout=ip_timeout)
 
-    def _single_user_form(self, selected_user):
-        base_form = self.get_form_class()
-
-        class SingleUserPasswordResetForm(base_form):
-            def get_users(self, email):
-                if selected_user and selected_user.has_usable_password():
-                    return [selected_user]
-                return []
-
-        return SingleUserPasswordResetForm
-
     def post(self, request, *args, **kwargs):
 
         email = request.POST.get('email', '').strip().lower()
@@ -1541,48 +1530,7 @@ class CustomPasswordResetView(PasswordResetView):
 
             return redirect('password_reset')
 
-        users = User.objects.filter(email__iexact=email)
-
-        if users.count() > 1 and not request.POST.get(
-            'selected_username'
-        ):
-
-            usernames = users.values_list(
-                'username',
-                flat=True
-            )
-
-            return render(
-                request,
-                'game/password_reset.html',
-                {
-                    'form': self.get_form(),
-                    'usernames': usernames,
-                    'email': email
-                }
-            )
-        selected_username = request.POST.get(
-            'selected_username'
-        )
-
-        form_class = self.get_form_class()
-        if selected_username:
-
-            selected_user = User.objects.filter(
-                username=selected_username,
-                email__iexact=email
-            ).first()
-
-            if not selected_user:
-                messages.error(
-                    request,
-                    'Please select a valid account for this email address.',
-                )
-                return redirect('password_reset')
-
-            form_class = self._single_user_form(selected_user)
-
-        form = form_class(**self.get_form_kwargs())
+        form = self.get_form()
         if not form.is_valid():
             return self.form_invalid(form)
 
@@ -2335,22 +2283,6 @@ def cleanup_cron(request):
             'status': 'error',
             'message': str(e)
         }, status=500)
-
-def password_reset_account_selection(request):
-
-    email = request.GET.get('email')
-
-    users = User.objects.filter(email=email)
-
-    return render(
-        request,
-        'game/password_reset_account_selection.html',
-        {
-            'users': users,
-            'email': email
-        }
-    )
-
 
 @login_required
 def delete_account(request):
