@@ -24,7 +24,8 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.utils.http import (
     urlsafe_base64_encode,
-    urlsafe_base64_decode
+    urlsafe_base64_decode,
+    url_has_allowed_host_and_scheme
 )
 
 from django.utils.encoding import (
@@ -4292,9 +4293,23 @@ def toggle_discussion_bookmark(request, discussion_id):
     if not created:
         bookmark.delete()
 
-    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER")
-    if next_url:
+    next_url = request.POST.get("next")
+    referer_url = request.META.get("HTTP_REFERER")
+    allowed_hosts = {request.get_host()}
+    require_https = request.is_secure()
+
+    if next_url and url_has_allowed_host_and_scheme(
+        url=next_url,
+        allowed_hosts=allowed_hosts,
+        require_https=require_https,
+    ):
         return redirect(next_url)
+    elif referer_url and url_has_allowed_host_and_scheme(
+        url=referer_url,
+        allowed_hosts=allowed_hosts,
+        require_https=require_https,
+    ):
+        return redirect(referer_url)
 
     return redirect("forum")
 
