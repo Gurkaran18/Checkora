@@ -70,7 +70,8 @@ class ChessGame:
     #  Construction / serialization
     # ------------------------------------------------------------------
 
-    def __init__(self, time_limit=600, increment=0, game_id=None, authkey=None):
+    def __init__(self, time_limit=600, increment=0, game_id=None,
+                 authkey=None):
         self.game_id = game_id or str(uuid.uuid4())
         self.authkey = authkey or os.urandom(16)
         self.board = [row[:] for row in self.INITIAL_BOARD]
@@ -182,7 +183,9 @@ DP cache is intentionally excluded to save cookie space."""
             'draw_reason': self.draw_reason,
             'threefold_warning': self.threefold_warning,
             'initial_fullmove': getattr(self, 'initial_fullmove', 1),
-            'initial_turn_was_black': getattr(self, 'initial_turn_was_black', False),
+            'initial_turn_was_black': getattr(
+                self, 'initial_turn_was_black', False
+            ),
         }
 
     def cleanup_engine(self):
@@ -190,12 +193,14 @@ DP cache is intentionally excluded to save cookie space."""
         game_id = getattr(self, 'game_id', None)
         if not game_id:
             return
-        
+
         import os
         import tempfile
         from multiprocessing.connection import Client
 
-        port_path = os.path.join(tempfile.gettempdir(), f'checkora_engine_{game_id}.port')
+        port_path = os.path.join(
+            tempfile.gettempdir(), f'checkora_engine_{game_id}.port'
+        )
         if os.path.exists(port_path):
             try:
                 with open(port_path, 'r') as f:
@@ -207,10 +212,14 @@ DP cache is intentionally excluded to save cookie space."""
                 conn.close()
             except Exception:
                 pass
-            
+
         # Clean up files
-        lock_path = os.path.join(tempfile.gettempdir(), f'checkora_engine_{game_id}.lock')
-        pid_path = os.path.join(tempfile.gettempdir(), f'checkora_engine_{game_id}.pid')
+        lock_path = os.path.join(
+            tempfile.gettempdir(), f'checkora_engine_{game_id}.lock'
+        )
+        pid_path = os.path.join(
+            tempfile.gettempdir(), f'checkora_engine_{game_id}.pid'
+        )
         for path in (lock_path, port_path, pid_path):
             if os.path.exists(path):
                 try:
@@ -224,7 +233,8 @@ DP cache is intentionally excluded to save cookie space."""
         game = cls.__new__(cls)
         game.game_id = data.get('game_id') or str(uuid.uuid4())
         authkey_hex = data.get('authkey')
-        game.authkey = bytes.fromhex(authkey_hex) if authkey_hex else os.urandom(16)
+        game.authkey = (bytes.fromhex(authkey_hex) if authkey_hex
+                        else os.urandom(16))
         game.board = data['board']
         game.current_turn = data['current_turn']
         game.move_history = data.get('move_history', [])
@@ -420,8 +430,12 @@ DP cache is intentionally excluded to save cookie space."""
         import tempfile
         from multiprocessing.connection import Client
 
-        port_path = os.path.join(tempfile.gettempdir(), f'checkora_engine_{game_id}.port')
-        lock_path = os.path.join(tempfile.gettempdir(), f'checkora_engine_{game_id}.lock')
+        port_path = os.path.join(
+            tempfile.gettempdir(), f'checkora_engine_{game_id}.port'
+        )
+        lock_path = os.path.join(
+            tempfile.gettempdir(), f'checkora_engine_{game_id}.lock'
+        )
 
         def get_address():
             if os.path.exists(port_path):
@@ -456,14 +470,18 @@ DP cache is intentionally excluded to save cookie space."""
             if lock_acquired:
                 # Spawn the server in the background
                 try:
-                    server_script = os.path.join(self.ENGINE_DIR, 'persistent_server.py')
-                    engine_cmd_json = json.dumps(self._build_engine_command(engine_path))
+                    server_script = os.path.join(
+                        self.ENGINE_DIR, 'persistent_server.py'
+                    )
+                    engine_cmd_json = json.dumps(
+                        self._build_engine_command(engine_path)
+                    )
                     authkey_hex = self.authkey.hex()
-                    
+
                     creationflags = 0
                     if os.name == 'nt':
                         creationflags = subprocess.CREATE_NO_WINDOW
-                    
+
                     if os.path.exists(port_path):
                         try:
                             os.unlink(port_path)
@@ -471,7 +489,8 @@ DP cache is intentionally excluded to save cookie space."""
                             pass
 
                     subprocess.Popen(
-                        [sys.executable, server_script, game_id, engine_cmd_json, authkey_hex],
+                        [sys.executable, server_script, game_id,
+                         engine_cmd_json, authkey_hex],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                         stdin=subprocess.DEVNULL,
@@ -488,7 +507,8 @@ DP cache is intentionally excluded to save cookie space."""
                     address = get_address()
                     if address:
                         try:
-                            conn = Client(address, family='AF_INET', authkey=self.authkey)
+                            conn = Client(address, family='AF_INET',
+                                          authkey=self.authkey)
                             break
                         except Exception:
                             pass
@@ -501,14 +521,16 @@ DP cache is intentionally excluded to save cookie space."""
                 except OSError:
                     pass
             else:
-                # Lock is held by someone else. Wait for lock release or connection to succeed
+                # Lock is held by someone else. Wait for lock release or
+                # connection to succeed
                 start_time = time.time()
                 backoff = 0.01
                 while time.time() - start_time < 2.0:
                     address = get_address()
                     if address:
                         try:
-                            conn = Client(address, family='AF_INET', authkey=self.authkey)
+                            conn = Client(address, family='AF_INET',
+                                          authkey=self.authkey)
                             break
                         except Exception:
                             pass
@@ -517,7 +539,8 @@ DP cache is intentionally excluded to save cookie space."""
                         address = get_address()
                         if address:
                             try:
-                                conn = Client(address, family='AF_INET', authkey=self.authkey)
+                                conn = Client(address, family='AF_INET',
+                                              authkey=self.authkey)
                             except Exception:
                                 pass
                         break
@@ -525,7 +548,8 @@ DP cache is intentionally excluded to save cookie space."""
                     backoff = min(backoff * 2, 0.1)
 
         if not conn:
-            # Fallback to stateless spawning if the server failed to start or connect
+            # Fallback to stateless spawning if the server failed to
+            # start or connect
             try:
                 proc = subprocess.Popen(
                     self._build_engine_command(engine_path),
@@ -534,7 +558,9 @@ DP cache is intentionally excluded to save cookie space."""
                     stderr=subprocess.PIPE,
                     text=True,
                 )
-                timeout_secs = getattr(self, "_analysis_timeout", self.ANALYSIS_TIMEOUT_SECONDS)
+                timeout_secs = getattr(
+                    self, "_analysis_timeout", self.ANALYSIS_TIMEOUT_SECONDS
+                )
                 stdout, _ = proc.communicate(input=command, timeout=timeout_secs)
                 return stdout.strip()
             except (subprocess.TimeoutExpired, OSError):
