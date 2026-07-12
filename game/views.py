@@ -694,15 +694,22 @@ def ai_move(request):
             temp_game.castling_rights = dict(game.castling_rights)
             temp_game.current_turn = game.current_turn
             temp_game.en_passant_target = game.en_passant_target
+            temp_game.move_history = [dict(m) for m in game.move_history]
+            temp_game.half_move_clock = game.half_move_clock
+            temp_game.captured = {k: list(v) for k, v in game.captured.items()}
             
             # Apply the suggested move
-            temp_game.make_move(best['from_row'], best['from_col'], best['to_row'], best['to_col'])
+            temp_game.make_move(
+                best['from_row'], best['from_col'], 
+                best['to_row'], best['to_col'],
+                promotion_piece=best.get('promotion_piece', 'q')
+            )
             
             # Request opponent's responses
             opp_resp = temp_game.get_ai_move(depth=depth)
             
             predicted_responses = []
-            if opp_resp and 'alts' in opp_resp:
+            if opp_resp:
                 predicted_responses.append({
                     'notation': temp_game._notation(
                         opp_resp['from_row'], opp_resp['from_col'], 
