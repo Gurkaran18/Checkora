@@ -13,11 +13,34 @@
         k: 0
     };
 
-
+    const savedPieceStyle = localStorage.getItem('pieceStyle') || 'neo';
     const PIECE_IMG = {};
-    for (const c of ['w', 'b'])
-        for (const t of ['k', 'q', 'r', 'b', 'n', 'p'])
-            PIECE_IMG[c + t] = `https://images.chesscomfiles.com/chess-themes/pieces/neo/150/${c}${t}.png`;
+    for (const c of ['w', 'b']) {
+        for (const t of ['k', 'q', 'r', 'b', 'n', 'p']) {
+            PIECE_IMG[c + t] = `https://images.chesscomfiles.com/chess-themes/pieces/${savedPieceStyle}/150/${c}${t}.png`;
+        }
+    }
+
+    function updatePieceStyle(style) {
+        for (const c of ['w', 'b']) {
+            for (const t of ['k', 'q', 'r', 'b', 'n', 'p']) {
+                PIECE_IMG[c + t] = `https://images.chesscomfiles.com/chess-themes/pieces/${style}/150/${c}${t}.png`;
+            }
+        }
+        
+        // Re-draw board pieces
+        if (typeof syncPieces === 'function') {
+            syncPieces();
+        }
+        
+        // Re-draw captured list pieces dynamically
+        document.querySelectorAll('.captured-img').forEach(img => {
+            const key = img.dataset.piece;
+            if (key && PIECE_IMG[key]) {
+                img.src = PIECE_IMG[key];
+            }
+        });
+    }
 
     const PIECE_NAMES = {
         'p': 'Pawn',
@@ -2601,8 +2624,10 @@ function updateStepperUI() {
         // Use createElement instead of innerHTML to prevent XSS and avoid DOM reflows
         const makeImg = (p) => {
             const img = document.createElement('img');
-            img.src = PIECE_IMG[pKey(p)];
+            const key = pKey(p);
+            img.src = PIECE_IMG[key];
             img.className = 'captured-img';
+            img.dataset.piece = key; // Save key for live piece style switching
             const name = pieceNames[p.toLowerCase()] || p;
             img.title = name;
             img.alt = name;
@@ -5093,6 +5118,11 @@ function updateStepperUI() {
             const boardThemeRadio = themeSettingsModal.querySelector(`input[name="boardThemeRadio"][value="${currentBoardTheme}"]`);
             if (boardThemeRadio) boardThemeRadio.checked = true;
 
+            // Sync Piece Style radio
+            const currentPieceStyle = localStorage.getItem('pieceStyle') || 'neo';
+            const pieceStyleRadio = themeSettingsModal.querySelector(`input[name="pieceStyleRadio"][value="${currentPieceStyle}"]`);
+            if (pieceStyleRadio) pieceStyleRadio.checked = true;
+
             // 2. Sync Sound Toggle
             const soundToggle = document.getElementById('modalSoundToggle');
             if (soundToggle) soundToggle.checked = soundEnabled;
@@ -5168,6 +5198,16 @@ function updateStepperUI() {
                         btn.setAttribute('aria-pressed', 'false');
                     }
                 });
+            });
+        });
+
+        // Handle Piece Style swatch switches
+        const pieceRadios = themeSettingsModal.querySelectorAll('input[name="pieceStyleRadio"]');
+        pieceRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                const selectedStyle = radio.value;
+                localStorage.setItem('pieceStyle', selectedStyle);
+                updatePieceStyle(selectedStyle);
             });
         });
 
