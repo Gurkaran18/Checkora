@@ -13,20 +13,23 @@
         k: 0
     };
 
-    const savedPieceStyle = localStorage.getItem('pieceStyle') || 'neo';
+    const VALID_PIECE_STYLES = ['neo', 'classic', 'alpha', 'cburnett'];
     const PIECE_IMG = {};
-    for (const c of ['w', 'b']) {
-        for (const t of ['k', 'q', 'r', 'b', 'n', 'p']) {
-            PIECE_IMG[c + t] = `https://images.chesscomfiles.com/chess-themes/pieces/${savedPieceStyle}/150/${c}${t}.png`;
+
+    function buildPieceImg(style) {
+        const targetStyle = VALID_PIECE_STYLES.includes(style) ? style : 'neo';
+        for (const c of ['w', 'b']) {
+            for (const t of ['k', 'q', 'r', 'b', 'n', 'p']) {
+                PIECE_IMG[c + t] = `https://images.chesscomfiles.com/chess-themes/pieces/${targetStyle}/150/${c}${t}.png`;
+            }
         }
     }
 
+    // Initialize piece style on page load
+    buildPieceImg(localStorage.getItem('pieceStyle'));
+
     function updatePieceStyle(style) {
-        for (const c of ['w', 'b']) {
-            for (const t of ['k', 'q', 'r', 'b', 'n', 'p']) {
-                PIECE_IMG[c + t] = `https://images.chesscomfiles.com/chess-themes/pieces/${style}/150/${c}${t}.png`;
-            }
-        }
+        buildPieceImg(style);
         
         // Re-draw board pieces
         if (typeof syncPieces === 'function') {
