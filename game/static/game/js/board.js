@@ -420,6 +420,89 @@
         }
     }
 
+    function updateEvalBarVisibility() {
+        if (!evalBarContainer) return;
+        const isPuzzle = dailyPuzzleMode;
+        const show = (gameMode === 'ai' || gameMode === 'analysis' || viewingPastState || replayMode) && !isPuzzle;
+        if (show) {
+            document.documentElement.classList.add('has-eval-bar');
+            if (flipped) {
+                evalBarContainer.classList.add('flipped');
+            } else {
+                evalBarContainer.classList.remove('flipped');
+            }
+        } else {
+            document.documentElement.classList.remove('has-eval-bar');
+        }
+    }
+
+    function updateEvalBar(evalResult, fen) {
+        if (!evalBarWhite || !evalBarScore) return;
+        let percentage = 50;
+        let displayLabel = '0.0';
+        if (evalResult) {
+            const type = evalResult.type;
+            const value = evalResult.value;
+            const sideToMove = fen ? fen.split(' ')[1] : 'w';
+            if (type === 'mate') {
+                let isWhiteMate = false;
+                if (sideToMove === 'w') {
+                    isWhiteMate = value > 0;
+                } else {
+                    isWhiteMate = value < 0;
+                }
+                displayLabel = `M${Math.abs(value)}`;
+                percentage = isWhiteMate ? 100 : 0;
+            } else {
+                let cp = value;
+                if (sideToMove === 'b') {
+                    cp = -cp;
+                }
+                const rawScore = cp / 100;
+                displayLabel = (rawScore >= 0 ? '+' : '') + rawScore.toFixed(1);
+                const val = 2 / (1 + Math.exp(-0.4 * rawScore)) - 1;
+                percentage = 50 + 50 * val;
+            }
+        }
+        evalBarWhite.style.height = `${percentage}%`;
+        evalBarScore.textContent = displayLabel;
+        const isWhiteAdvantage = percentage >= 50;
+        evalBarScore.style.top = '';
+        evalBarScore.style.bottom = '';
+        if (!flipped) {
+            if (isWhiteAdvantage) {
+                evalBarScore.style.bottom = '8px';
+                evalBarScore.style.color = '#1a1a2e';
+            } else {
+                evalBarScore.style.top = '8px';
+                evalBarScore.style.color = '#ffffff';
+            }
+        } else {
+            if (isWhiteAdvantage) {
+                evalBarScore.style.top = '8px';
+                evalBarScore.style.color = '#1a1a2e';
+            } else {
+                evalBarScore.style.bottom = '8px';
+                evalBarScore.style.color = '#ffffff';
+            }
+        }
+    }
+
+    async function triggerPositionEvaluation() {
+        if (!evalBarContainer || !document.documentElement.classList.contains('has-eval-bar')) {
+            return;
+        }
+        const currentFen = liveFen;
+        try {
+            const result = await getStockfishEval(currentFen);
+            if (liveFen === currentFen) {
+                updateEvalBar(result, currentFen);
+            }
+        } catch (e) {
+            console.error("Evaluation error:", e);
+        }
+    }
+
     async function precalculateExpectedMoveEval() {
         if (!currentPuzzle) return;
         const expectedMove = currentPuzzle.solution[puzzleMoveIndex];
@@ -681,6 +764,9 @@
     const copyFenBtn = document.getElementById('copyFenBtn');
     const copyPgnBtn = document.getElementById('copyPgnBtn');
     const muteBtn = document.getElementById('muteBtn');
+    const evalBarContainer = document.getElementById('evalBarContainer');
+    const evalBarWhite = document.getElementById('evalBarWhite');
+    const evalBarScore = document.getElementById('evalBarScore');
 
     const welcomeOverlay = document.getElementById('welcomeOverlay');
     const welcomeResumeBtn = document.getElementById('welcomeResumeBtn');
@@ -1324,6 +1410,7 @@
                 streakCounter.style.display = "block";
             }
         }
+        triggerPositionEvaluation();
     }
 
     function updatePlayerNames(data) {
@@ -1404,6 +1491,7 @@
     BOARD RENDERING
     ========================================================== */
     function buildBoard() {
+        updateEvalBarVisibility();
         const bc = document.querySelector('.board-container');
         if (bc) bc.classList.toggle('flipped', flipped);
         boardEl.innerHTML = '';
@@ -2079,6 +2167,8 @@
                     if (a11yMsg) announceMove(a11yMsg);
                 }
 
+                triggerPositionEvaluation();
+
                 if (gameMode === 'ai' && turn !== playerColor && !gameOver) {
                     requestAIMove();
                 }
@@ -2242,6 +2332,8 @@
                         }
                     }
                     if (a11yMsg) announceMove(a11yMsg);
+
+                    triggerPositionEvaluation();
 
                     // Trigger queued premove if it exists
                     if (premoveQueue.length > 0) {
@@ -2420,6 +2512,14 @@
         if (typeof updateMaterialUI === 'function') {
             updateMaterialUI(board);
         }
+        updateEvalBarVisibility();
+        if (fen && !dailyPuzzleMode) {
+            getStockfishEval(fen).then(result => {
+                if (replayBoard && replayBoard.fen() === fen) {
+                    updateEvalBar(result, fen);
+                }
+            });
+        }
     }
     function goToReplayMove(index) {
 
@@ -2499,6 +2599,15 @@ function updateStepperUI() {
     if (fen) renderStepperPosition(fen);
 
     viewingPastState = (stepperIndex < gameFens.length - 1);
+
+    updateEvalBarVisibility();
+    if (fen && (gameMode === 'ai' || gameMode === 'analysis') && !dailyPuzzleMode) {
+        getStockfishEval(fen).then(result => {
+            if (gameFens[stepperIndex] === fen) {
+                updateEvalBar(result, fen);
+            }
+        });
+    }
 
     const resumeBtn = document.getElementById('resumeGameBtn');
     if (resumeBtn) resumeBtn.classList.toggle('hidden', !viewingPastState);
