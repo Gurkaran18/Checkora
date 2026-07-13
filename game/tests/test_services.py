@@ -1,6 +1,9 @@
 from django.test import TestCase, RequestFactory
 from django.contrib.auth import get_user_model
 from django.contrib.sessions.middleware import SessionMiddleware
+import time
+import json
+from django.utils import timezone
 
 from game.models import (
     ActiveGame,
@@ -16,9 +19,21 @@ from game.services import (
     check_game_achievements,
     check_puzzle_achievements,
     update_opening_progress,
+    cleanup_stale_games,
 )
 
 User = get_user_model()
+
+INITIAL_BOARD = [
+    ['r', 'n', 'b', 'q', 'k', 'b', 'n', 'r'],
+    ['p', 'p', 'p', 'p', 'p', 'p', 'p', 'p'],
+    [None, None, None, None, None, None, None, None],
+    [None, None, None, None, None, None, None, None],
+    [None, None, None, None, None, None, None, None],
+    [None, None, None, None, None, None, None, None],
+    ['P', 'P', 'P', 'P', 'P', 'P', 'P', 'P'],
+    ['R', 'N', 'B', 'Q', 'K', 'B', 'N', 'R']
+]
 
 
 class TestAchievementServices(TestCase):
@@ -294,6 +309,7 @@ class TestActiveGameServices(TestCase):
         )
         self.assertEqual(active_game.user, self.user)
         self.assertEqual(active_game.status, "active")
+        self.assertEqual(active_game.game_state, {"game_status": "active"})
 
         # Delete the record when game_status is not "active"
         create_or_update_active_game(request, {"game_status": "checkmate"})
@@ -312,6 +328,7 @@ class TestActiveGameServices(TestCase):
             session_key=request.session.session_key
         )
         self.assertIsNone(anon_game.user)
+        self.assertIsNone(anon_game.game_state)
 
     def test_delete_active_game(self):
         request = self.factory.get("/")
@@ -335,3 +352,193 @@ class TestActiveGameServices(TestCase):
         request2 = self.factory.get("/")
         middleware.process_request(request2)
         delete_active_game(request2)  # Should not raise exception
+
+
+class ActiveGamePersistenceTest(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username="testplayer", password="password"
+        )
+        self.client.force_login(self.user)
+        self.game_state = {
+            'board': INITIAL_BOARD,
+            'current_turn': 'white',
+            'move_history': [],
+            'captured': {'white': [], 'black': []},
+            'white_time': 600,
+            'black_time': 600,
+            'time_limit': 600,
+            'increment': 0,
+            'last_ts': time.time(),
+            'paused': False,
+            'mode': 'pvp',
+            'player_color': 'white',
+            'game_status': 'active'
+        }
+
+    def test_cross_device_resume(self):
+        # 1. Start a game on device 1
+        response = self.client.post('/api/new-game/', json.dumps({
+            'mode': 'pvp',
+            'time_limit': 600
+        }), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        
+        # Check active game in database
+        ag = ActiveGame.objects.filter(user=self.user, status="active").first()
+        self.assertIsNotNone(ag)
+        
+        # 2. Open a new session / device (by logging out and logging in again)
+        self.client.logout()
+        self.client.force_login(self.user)
+        
+        # Call resume-game
+        response_resume = self.client.post('/api/resume/', content_type='application/json')
+        self.assertEqual(response_resume.status_code, 200)
+        self.assertTrue(response_resume.json()['valid'])
+        
+        # Verify the session key on the active game is updated to the new session key
+        ag.refresh_from_db()
+        new_session_key = self.client.session.session_key
+        self.assertEqual(ag.session_key, new_session_key)
+
+    def test_session_refresh_rotation(self):
+        # Start a game
+        self.client.post('/api/new-game/', json.dumps({
+            'mode': 'pvp',
+            'time_limit': 600
+        }), content_type='application/json')
+        
+        ag = ActiveGame.objects.filter(user=self.user, status="active").first()
+        old_session_key = ag.session_key
+        
+        # Simulate session key rotation by creating a new session store
+        from django.contrib.sessions.backends.db import SessionStore
+        from django.conf import settings
+        session = self.client.session
+        session_data = dict(session.items())
+        
+        new_session = SessionStore()
+        for k, v in session_data.items():
+            new_session[k] = v
+        new_session.save()
+        
+        new_session_key = new_session.session_key
+        self.client.cookies[settings.SESSION_COOKIE_NAME] = new_session_key
+        
+        # Call resume-game or make a move to trigger key update
+        response = self.client.post('/api/resume/', content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        
+        ag.refresh_from_db()
+        self.assertEqual(ag.session_key, new_session_key)
+        self.assertNotEqual(ag.session_key, old_session_key)
+
+    def test_optimistic_locking_conflict(self):
+        # Start a game
+        response = self.client.post('/api/new-game/', json.dumps({
+            'mode': 'pvp',
+            'time_limit': 600
+        }), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        init_version = response.json()['version']
+        
+        # Play a move (A) with version = init_version
+        move_payload = {
+            'from_row': 6, 'from_col': 4,
+            'to_row': 4, 'to_col': 4,
+            'version': init_version
+        }
+        response_a = self.client.post('/api/move/', json.dumps(move_payload), content_type='application/json')
+        self.assertEqual(response_a.status_code, 200)
+        self.assertTrue(response_a.json()['valid'])
+        new_version = response_a.json()['version']
+        self.assertEqual(new_version, init_version + 1)
+        
+        # Play another move (B) but send the stale init_version (optimistic lock conflict)
+        move_payload_stale = {
+            'from_row': 1, 'from_col': 4,
+            'to_row': 3, 'to_col': 4,
+            'version': init_version
+        }
+        response_b = self.client.post('/api/move/', json.dumps(move_payload_stale), content_type='application/json')
+        self.assertEqual(response_b.status_code, 409)
+        self.assertIn('Conflict', response_b.json()['error'])
+
+    def test_game_completion(self):
+        # Start a game
+        self.client.post('/api/new-game/', json.dumps({
+            'mode': 'pvp',
+            'time_limit': 600
+        }), content_type='application/json')
+        
+        ag = ActiveGame.objects.filter(user=self.user, status="active").first()
+        self.assertIsNotNone(ag)
+        
+        # Resign the game (completed)
+        response = self.client.post('/api/resign/', json.dumps({
+            'resigning_player': 'white'
+        }), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        
+        # Verify that ActiveGame is deleted
+        self.assertFalse(ActiveGame.objects.filter(user=self.user).exists())
+        
+        # Verify that GameResult is created
+        self.assertEqual(GameResult.objects.filter(user=self.user).count(), 1)
+
+    def test_stale_cleanup(self):
+        # Create a stale game for authenticated user
+        ag = ActiveGame.objects.create(
+            user=self.user,
+            session_key="auth_stale_session_123",
+            game_state={
+                'board': INITIAL_BOARD,
+                'current_turn': 'white',
+                'move_history': [1, 2, 3, 4, 5, 6],  # >= 5 moves -> resignation
+                'player_color': 'white',
+                'mode': 'pvp',
+                'game_status': 'active'
+            },
+            status="active",
+            version=1
+        )
+        # Update last_activity_at to be stale (50 hours ago)
+        ActiveGame.objects.filter(pk=ag.pk).update(
+            last_activity_at=timezone.now() - timezone.timedelta(hours=50)
+        )
+        
+        deleted, resigned = cleanup_stale_games()
+        self.assertEqual(deleted, 0)
+        self.assertEqual(resigned, 1)
+        self.assertFalse(ActiveGame.objects.filter(pk=ag.pk).exists())
+        self.assertEqual(GameResult.objects.filter(user=self.user).count(), 1)
+
+    def test_anonymous_gameplay_fallback(self):
+        self.client.logout()  # Make request anonymous
+        
+        # Start game
+        response = self.client.post('/api/new-game/', json.dumps({
+            'mode': 'pvp',
+            'time_limit': 600
+        }), content_type='application/json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['version'], 0)
+        
+        # Verify ActiveGame tracking record exists but game_state is None
+        ag = ActiveGame.objects.filter(session_key=self.client.session.session_key).first()
+        self.assertIsNotNone(ag)
+        self.assertIsNone(ag.game_state)
+        
+        # Make a move
+        move_payload = {
+            'from_row': 6, 'from_col': 4,
+            'to_row': 4, 'to_col': 4
+        }
+        response_move = self.client.post('/api/move/', json.dumps(move_payload), content_type='application/json')
+        self.assertEqual(response_move.status_code, 200)
+        self.assertEqual(response_move.json()['version'], 0)
+        
+        # Game state in db must remain None (preserving session-only flow)
+        ag.refresh_from_db()
+        self.assertIsNone(ag.game_state)

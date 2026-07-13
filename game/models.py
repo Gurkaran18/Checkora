@@ -11,6 +11,7 @@ from django.utils import timezone
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
+
 class GameResult(models.Model):
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -513,12 +514,31 @@ class GameRecord(models.Model):
     def __str__(self):
         return f"Game {self.id} ({self.white_label} vs {self.black_label})"
 
+def validate_game_state(value):
+    if not value:
+        return
+    if not isinstance(value, dict):
+        raise ValidationError("game_state must be a dictionary")
+    if 'board' not in value or 'current_turn' not in value:
+        raise ValidationError("game_state must contain 'board' and 'current_turn'")
+
 class ActiveGame(models.Model):
     """Tracks active games for efficient cleanup."""
 
     class Meta:
         indexes = [
-            models.Index(fields=["status", "last_active"]),
+            models.Index(fields=["status", "last_activity_at"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user"],
+                condition=models.Q(status="active", user__isnull=False),
+                name="unique_active_game_per_user"
+            ),
+            models.CheckConstraint(
+                condition=models.Q(version__gte=0),
+                name="activegame_version_gte_0"
+            )
         ]
 
     user = models.ForeignKey(
@@ -533,7 +553,7 @@ class ActiveGame(models.Model):
         unique=True,
     )
 
-    last_active = models.DateTimeField(
+    last_activity_at = models.DateTimeField(
         auto_now=True,
         db_index=True,
     )
@@ -548,8 +568,22 @@ class ActiveGame(models.Model):
         auto_now_add=True,
     )
 
+    game_state = models.JSONField(
+        null=True,
+        blank=True,
+        validators=[validate_game_state]
+    )
+
+    version = models.IntegerField(
+        default=0,
+    )
+
     def __str__(self):
         return f"{self.session_key} ({self.status})"
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 class Discussion(models.Model):
     user = models.ForeignKey(
