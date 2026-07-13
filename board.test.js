@@ -262,7 +262,7 @@ window.matchMedia = window.matchMedia || function() {
   };
 };
 
-const { pColor, getSquareLabel, formatTime, getPlayerScore, validateMoveWithStockfish, clearEvaluationCache, onClick, onDragStart, onDrop, showPromoModal, hidePromoModal, onPromoChoice, toggleSquareHighlight, refreshHighlights, highlightCheck, startNewGame, squareLabelToRowCol, computeLegalMovesClient } = require("./game/static/game/js/board");
+const { pColor, getSquareLabel, formatTime, getPlayerScore, validateMoveWithStockfish, clearEvaluationCache, onClick, onDragStart, onDrop, showPromoModal, hidePromoModal, onPromoChoice, toggleSquareHighlight, refreshHighlights, highlightCheck, startNewGame, squareLabelToRowCol, computeLegalMovesClient, updatePieceStyle, PIECE_IMG, VALID_PIECE_STYLES } = require("./game/static/game/js/board");
 
 describe("pColor", () => {
   test("returns white for uppercase piece", () => {
@@ -782,6 +782,17 @@ describe("SAN Quick Move Input", () => {
     expect(body.to_row).toBe(3);
     expect(body.to_col).toBe(3);
   });
+  it('rapid double Enter does not fire two overlapping move requests', async () => {
+    const input = document.getElementById("sanMoveInput");
+    input.value = "e4";
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    await flushPromises();
+
+    const moveReqs = global.fetch.mock.calls.filter(c => c[0].includes('/api/move/'));
+    expect(moveReqs.length).toBe(1);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -890,6 +901,28 @@ describe("Client-side legal move computation (Issue #1445)", () => {
       const dots = boardEl.querySelectorAll('.move-dot');
       // MockChess returns 2 moves for e2 (e3, e4) - both are non-captures
       expect(dots.length).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("Customizable Piece Styles Theme", () => {
+    it("has a list of valid piece styles including neo, classic, alpha, cburnett", () => {
+      expect(VALID_PIECE_STYLES).toContain("neo");
+      expect(VALID_PIECE_STYLES).toContain("classic");
+      expect(VALID_PIECE_STYLES).toContain("alpha");
+      expect(VALID_PIECE_STYLES).toContain("cburnett");
+    });
+
+    it("updates PIECE_IMG correctly when updatePieceStyle is called", () => {
+      updatePieceStyle("classic");
+      expect(PIECE_IMG["wk"]).toBe("https://images.chesscomfiles.com/chess-themes/pieces/classic/150/wk.png");
+      expect(PIECE_IMG["bp"]).toBe("https://images.chesscomfiles.com/chess-themes/pieces/classic/150/bp.png");
+      
+      updatePieceStyle("alpha");
+      expect(PIECE_IMG["wk"]).toBe("https://images.chesscomfiles.com/chess-themes/pieces/alpha/150/wk.png");
+      
+      // Falls back to neo if invalid theme is given
+      updatePieceStyle("invalid_theme_name");
+      expect(PIECE_IMG["wk"]).toBe("https://images.chesscomfiles.com/chess-themes/pieces/neo/150/wk.png");
     });
   });
 });

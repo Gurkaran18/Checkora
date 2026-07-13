@@ -13,11 +13,37 @@
         k: 0
     };
 
-
+    const VALID_PIECE_STYLES = ['neo', 'classic', 'alpha', 'cburnett'];
     const PIECE_IMG = {};
-    for (const c of ['w', 'b'])
-        for (const t of ['k', 'q', 'r', 'b', 'n', 'p'])
-            PIECE_IMG[c + t] = `https://images.chesscomfiles.com/chess-themes/pieces/neo/150/${c}${t}.png`;
+
+    function buildPieceImg(style) {
+        const targetStyle = VALID_PIECE_STYLES.includes(style) ? style : 'neo';
+        for (const c of ['w', 'b']) {
+            for (const t of ['k', 'q', 'r', 'b', 'n', 'p']) {
+                PIECE_IMG[c + t] = `https://images.chesscomfiles.com/chess-themes/pieces/${targetStyle}/150/${c}${t}.png`;
+            }
+        }
+    }
+
+    // Initialize piece style on page load
+    buildPieceImg(localStorage.getItem('pieceStyle'));
+
+    function updatePieceStyle(style) {
+        buildPieceImg(style);
+        
+        // Re-draw board pieces
+        if (typeof syncPieces === 'function') {
+            syncPieces();
+        }
+        
+        // Re-draw captured list pieces dynamically
+        document.querySelectorAll('.captured-img').forEach(img => {
+            const key = img.dataset.piece;
+            if (key && PIECE_IMG[key]) {
+                img.src = PIECE_IMG[key];
+            }
+        });
+    }
 
     const PIECE_NAMES = {
         'p': 'Pawn',
@@ -2601,8 +2627,10 @@ function updateStepperUI() {
         // Use createElement instead of innerHTML to prevent XSS and avoid DOM reflows
         const makeImg = (p) => {
             const img = document.createElement('img');
-            img.src = PIECE_IMG[pKey(p)];
+            const key = pKey(p);
+            img.src = PIECE_IMG[key];
             img.className = 'captured-img';
+            img.dataset.piece = key; // Save key for live piece style switching
             const name = pieceNames[p.toLowerCase()] || p;
             img.title = name;
             img.alt = name;
@@ -2750,14 +2778,11 @@ function updateStepperUI() {
             const spans = row.querySelectorAll('.move-white, .move-black');
             spans.forEach(span => {
                 const rawMove = span.textContent?.replace(/\s+/g, '')?.trim();
+                const move = rawMove?.replace(/[+#]/g, '');
+
                 if (rawMove && rawMove !== '...') {
                     rawAnalysisMoves.push(rawMove);
                 }
-                
-                const move = span.textContent
-                    ?.replace(/[+#]/g, '')
-                    ?.replace(/\s+/g, '')
-                    ?.trim();
 
                 if (move && move !== '...') {
                     console.log("Replay move added:", move);
@@ -2767,7 +2792,9 @@ function updateStepperUI() {
         });
 
         console.log("FINAL REPLAY MOVES:", replayMoves);
-        console.log("FINAL RAW MOVES:", rawAnalysisMoves);
+        if (typeof process === 'undefined' || process.env.NODE_ENV !== 'test') {
+            console.log("FINAL RAW MOVES:", rawAnalysisMoves);
+        }
 
         if (window.Chess) {
             replayBoard = new window.Chess();
@@ -4683,111 +4710,106 @@ function updateStepperUI() {
     const sanMoveBtn = document.getElementById('sanMoveBtn');
     const sanMoveError = document.getElementById('sanMoveError');
 
-    async function handleSanMove() {
-        if (!sanMoveInput) return;
-        let san = sanMoveInput.value.trim();
-        if (!san) return;
-        
-        if (sanMoveError) sanMoveError.style.display = 'none';
+    let isSanMoveInFlight = false;  
 
-        if (paused || gameOver) {
-            if (sanMoveError) {
-                sanMoveError.textContent = 'Game is not active';
-                sanMoveError.style.display = 'block';
-            }
-            flashBoard();
-            return;
+async function handleSanMove() {
+    if (!sanMoveInput) return;
+    if (isSanMoveInFlight) return;
+    let san = sanMoveInput.value.trim();
+    if (!san) return;
+    
+    if (sanMoveError) sanMoveError.style.display = 'none';
+
+    if (paused || gameOver) {
+        if (sanMoveError) {
+            sanMoveError.textContent = 'Game is not active';
+            sanMoveError.style.display = 'block';
         }
-
-        if (gameMode === 'ai' && turn !== playerColor) {
-            if (sanMoveError) {
-                sanMoveError.textContent = 'Not your turn';
-                sanMoveError.style.display = 'block';
-            }
-            flashBoard();
-            return;
-        }
-
-        if (sanMoveBtn) sanMoveBtn.disabled = true;
-
-        try {
-            const data = await get('/api/state/');
-            if (!data.fen) throw new Error("No FEN");
-            
-            if (!window.Chess) throw new Error("Chess engine not loaded");
-            const chess = new window.Chess(data.fen);
-            
-            // Minimal normalization: fix casing so chess.js can parse user input
-            // Rules:
-            //   - Castling variants: map to standard O-O / O-O-O
-            //   - Uppercase [NBRQK]: definite piece move — uppercase first char, lowercase body, preserve suffix
-            //   - Lowercase [nrqk]: definite piece move (n,r,q,k are not valid pawn files) — same as above
-            //   - Lowercase 'b' and all [a-h]/[A-H]: pawn move — lowercase entire body, preserve suffix
-            // Promotion suffix (=Q/=R etc) is always uppercased; check/checkmate (+/#) is preserved as-is.
-            if (/^[0oO]-[0oO]-[0oO]$/i.test(san)) {
-                san = 'O-O-O';
-            } else if (/^[0oO]-[0oO]$/i.test(san)) {
-                san = 'O-O';
-            } else {
-                // Strip trailing check/checkmate and promotion to preserve them exactly
-                const promoMatch = san.match(/=([qrbnQRBN])([+#]?)$/);
-                const suffix = promoMatch
-                    ? `=${promoMatch[1].toUpperCase()}${promoMatch[2]}`
-                    : san.match(/[+#]$/) ? san.slice(-1) : '';
-                const body = promoMatch
-                    ? san.slice(0, san.lastIndexOf('='))
-                    : suffix ? san.slice(0, -1) : san;
-
-                if (/^[NBRQK]/.test(san) || /^[nrqk]/.test(san)) {
-                    // Piece move: uppercase first char, lowercase rest of body
-                    san = body.charAt(0).toUpperCase() + body.slice(1).toLowerCase() + suffix;
-                } else if (/^[a-h]/i.test(san)) {
-                    // Pawn move (files a-h, including lowercase 'b'): fully lowercase body
-                    san = body.toLowerCase() + suffix;
-                }
-            }
-            
-            const moveObj = chess.move(san);
-            if (!moveObj) {
-                if (sanMoveError) {
-                    sanMoveError.textContent = 'Invalid or illegal move notation';
-                    sanMoveError.style.display = 'block';
-                }
-                flashBoard();
-                if (sanMoveBtn) sanMoveBtn.disabled = false;
-                return;
-            }
-            
-            const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-            const ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
-            
-            const fc = files.indexOf(moveObj.from[0]);
-            const fr = ranks.indexOf(moveObj.from[1]);
-            const tc = files.indexOf(moveObj.to[0]);
-            const tr = ranks.indexOf(moveObj.to[1]);
-            const promo = moveObj.promotion || null;
-            
-            const result = await executeMove(fr, fc, tr, tc, promo);
-            if (result && result.success) {
-                sanMoveInput.value = '';
-                sanMoveInput.blur();
-            } else {
-                if (sanMoveError) {
-                    sanMoveError.textContent = (result && result.message) ? result.message : 'Move rejected';
-                    sanMoveError.style.display = 'block';
-                }
-                flashBoard();
-            }
-        } catch (err) {
-            console.error('SAN Move Error:', err);
-            if (sanMoveError) {
-                sanMoveError.textContent = 'Error processing move';
-                sanMoveError.style.display = 'block';
-            }
-        } finally {
-            if (sanMoveBtn) sanMoveBtn.disabled = false;
-        }
+        flashBoard();
+        return;
     }
+
+    if (gameMode === 'ai' && turn !== playerColor) {
+        if (sanMoveError) {
+            sanMoveError.textContent = 'Not your turn';
+            sanMoveError.style.display = 'block';
+        }
+        flashBoard();
+        return;
+    }
+
+    isSanMoveInFlight = true;
+    if (sanMoveBtn) sanMoveBtn.disabled = true;
+
+    try {
+        const data = await get('/api/state/');
+        if (!data.fen) throw new Error("No FEN");
+        
+        if (!window.Chess) throw new Error("Chess engine not loaded");
+        const chess = new window.Chess(data.fen);
+        
+        if (/^[0oO]-[0oO]-[0oO]$/i.test(san)) {
+            san = 'O-O-O';
+        } else if (/^[0oO]-[0oO]$/i.test(san)) {
+            san = 'O-O';
+        } else {
+            const promoMatch = san.match(/=([qrbnQRBN])([+#]?)$/);
+            const suffix = promoMatch
+                ? `=${promoMatch[1].toUpperCase()}${promoMatch[2]}`
+                : san.match(/[+#]$/) ? san.slice(-1) : '';
+            const body = promoMatch
+                ? san.slice(0, san.lastIndexOf('='))
+                : suffix ? san.slice(0, -1) : san;
+
+            if (/^[NBRQK]/.test(san) || /^[nrqk]/.test(san)) {
+                san = body.charAt(0).toUpperCase() + body.slice(1).toLowerCase() + suffix;
+            } else if (/^[a-h]/i.test(san)) {
+                san = body.toLowerCase() + suffix;
+            }
+        }
+        
+        const moveObj = chess.move(san);
+        if (!moveObj) {
+            if (sanMoveError) {
+                sanMoveError.textContent = 'Invalid or illegal move notation';
+                sanMoveError.style.display = 'block';
+            }
+            flashBoard();
+            if (sanMoveBtn) sanMoveBtn.disabled = false;
+            return;
+        }
+        
+        const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+        const ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
+        
+        const fc = files.indexOf(moveObj.from[0]);
+        const fr = ranks.indexOf(moveObj.from[1]);
+        const tc = files.indexOf(moveObj.to[0]);
+        const tr = ranks.indexOf(moveObj.to[1]);
+        const promo = moveObj.promotion || null;
+        
+        const result = await executeMove(fr, fc, tr, tc, promo);
+        if (result && result.success) {
+            sanMoveInput.value = '';
+            sanMoveInput.blur();
+        } else {
+            if (sanMoveError) {
+                sanMoveError.textContent = (result && result.message) ? result.message : 'Move rejected';
+                sanMoveError.style.display = 'block';
+            }
+            flashBoard();
+        }
+    } catch (err) {
+        console.error('SAN Move Error:', err);
+        if (sanMoveError) {
+            sanMoveError.textContent = 'Error processing move';
+            sanMoveError.style.display = 'block';
+        }
+    } finally {
+        isSanMoveInFlight = false;
+        if (sanMoveBtn) sanMoveBtn.disabled = false;
+    }
+}
 
     if (sanMoveInput) {
         sanMoveInput.addEventListener('keydown', (e) => {
@@ -5093,6 +5115,11 @@ function updateStepperUI() {
             const boardThemeRadio = themeSettingsModal.querySelector(`input[name="boardThemeRadio"][value="${currentBoardTheme}"]`);
             if (boardThemeRadio) boardThemeRadio.checked = true;
 
+            // Sync Piece Style radio
+            const currentPieceStyle = localStorage.getItem('pieceStyle') || 'neo';
+            const pieceStyleRadio = themeSettingsModal.querySelector(`input[name="pieceStyleRadio"][value="${currentPieceStyle}"]`);
+            if (pieceStyleRadio) pieceStyleRadio.checked = true;
+
             // 2. Sync Sound Toggle
             const soundToggle = document.getElementById('modalSoundToggle');
             if (soundToggle) soundToggle.checked = soundEnabled;
@@ -5168,6 +5195,16 @@ function updateStepperUI() {
                         btn.setAttribute('aria-pressed', 'false');
                     }
                 });
+            });
+        });
+
+        // Handle Piece Style swatch switches
+        const pieceRadios = themeSettingsModal.querySelectorAll('input[name="pieceStyleRadio"]');
+        pieceRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                const selectedStyle = radio.value;
+                localStorage.setItem('pieceStyle', selectedStyle);
+                updatePieceStyle(selectedStyle);
             });
         });
 
@@ -5324,7 +5361,7 @@ function updateStepperUI() {
         module.exports = { 
             pColor, getSquareLabel, formatTime, getPlayerScore, validateMoveWithStockfish, clearEvaluationCache,
             onClick, onDragStart, onDrop, showPromoModal, hidePromoModal, onPromoChoice, toggleSquareHighlight, refreshHighlights, highlightCheck, startNewGame,
-            squareLabelToRowCol, computeLegalMovesClient
+            squareLabelToRowCol, computeLegalMovesClient, updatePieceStyle, PIECE_IMG, VALID_PIECE_STYLES
         };
     } else {
         loadGame();
