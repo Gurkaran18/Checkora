@@ -112,7 +112,7 @@ class SearchFeaturesTest(SimpleTestCase):
 
     def test_transposition_table_cache_hits(self):
         """Transposition table must correctly cache evaluations and produce hits on repeated positions."""
-        # We run a search to depth 3 on a simple board which should trigger hits
+        # We run a search to depth 4 on a simple board which should trigger hits
         python_engine.BOARD[7][4] = 'K'
         python_engine.BOARD[7][0] = 'R'
         python_engine.BOARD[0][4] = 'k'
@@ -123,19 +123,20 @@ class SearchFeaturesTest(SimpleTestCase):
         old_stdout = sys.stdout
         sys.stdout = StringIO()
         try:
-            python_engine.handle_bestmove('white', 3, time_limit_ms=5000)
+            python_engine.handle_bestmove('white', 4, time_limit_ms=5000)
             output = sys.stdout.getvalue().strip()
         finally:
             sys.stdout = old_stdout
 
         # Check for TTHITS in metrics
         parts = output.split()
-        tthits_val = 0
+        self.assertIn("TTHITS", parts)
+        tthits_val = -1
         for i, part in enumerate(parts):
             if part == "TTHITS":
                 tthits_val = int(parts[i+1])
                 break
-        self.assertGreaterEqual(tthits_val, 0)
+        self.assertGreater(tthits_val, 0)
 
     def test_wrapper_metrics_parsing(self):
         """Django wrapper ChessGame must correctly parse new metrics from engine responses."""

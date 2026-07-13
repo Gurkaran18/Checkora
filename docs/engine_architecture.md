@@ -39,7 +39,7 @@ stdout, _ = proc.communicate(input=command, timeout=5)
 | Command | Purpose | Example |
 |---------|---------|---------|
 | `MOVES` | Get valid moves for a piece | `MOVES <board> <castling> <turn> <ep> <row> <col>` |
-| `BESTMOVE` | Get AI best move | `BESTMOVE <board> <castling> <turn> <ep> <depth>` |
+| `BESTMOVE` | Get AI best move | `BESTMOVE <board> <castling> <turn> <ep> <depth> [time_budget_ms]` |
 | `STATUS` | Get game status | `STATUS <board> <castling> <turn> <ep>` |
 | `PROMOTE` | Handle pawn promotion | `PROMOTE <board> <castling> <turn> <ep> <fr> <fc> <tr> <tc> <piece>` |
 | `NOTATION` | Generate SAN notation | `NOTATION <board> <castling> <turn> <ep> <fr> <fc> <tr> <tc>` |
