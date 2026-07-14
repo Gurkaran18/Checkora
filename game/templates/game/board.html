@@ -513,7 +513,7 @@
                 </div>
             </div>
 
-            <div class="card controls-card">
+            <div class="card controls-card" id="boardThemeCard">
                 <div class="card-title">Board Theme</div>
                 <div class="theme-switcher">
                     <div class="theme-option">
@@ -543,7 +543,7 @@
                 </div>
             </div>
 
-            <div class="card controls-card">
+            <div class="card controls-card" id="gameControlsCard">
                 <div class="card-title">Game Controls</div>
                 <div style="display: flex; flex-direction: column; gap: 8px;">
                     <button type="button" class="btn btn-gold" id="flipBtn" title="Shortcut: F">Flip Board<span class="btn-shortcut">F</span></button>
@@ -940,6 +940,18 @@
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
     <script src="{% static 'game/js/board.js' %}"></script>
+
+<!-- First-time visitor onboarding tour -->
+<div id="tourOverlay" class="tour-overlay" style="display:none;">
+    <div id="tourTooltip" class="tour-tooltip">
+        <p id="tourStepLabel" class="tour-step-label"></p>
+        <p id="tourStepText" class="tour-step-text"></p>
+        <div class="tour-actions">
+            <button type="button" id="tourSkipBtn" class="tour-skip-btn">Skip tour</button>
+            <button type="button" id="tourNextBtn" class="tour-next-btn">Next →</button>
+        </div>
+    </div>
+</div>
 
 <script src="{% static 'game/js/theme.js' %}?v=1"></script>
 </body>
