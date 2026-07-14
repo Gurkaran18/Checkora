@@ -13,11 +13,37 @@
         k: 0
     };
 
-
+    const VALID_PIECE_STYLES = ['neo', 'classic', 'alpha', 'cburnett'];
     const PIECE_IMG = {};
-    for (const c of ['w', 'b'])
-        for (const t of ['k', 'q', 'r', 'b', 'n', 'p'])
-            PIECE_IMG[c + t] = `https://images.chesscomfiles.com/chess-themes/pieces/neo/150/${c}${t}.png`;
+
+    function buildPieceImg(style) {
+        const targetStyle = VALID_PIECE_STYLES.includes(style) ? style : 'neo';
+        for (const c of ['w', 'b']) {
+            for (const t of ['k', 'q', 'r', 'b', 'n', 'p']) {
+                PIECE_IMG[c + t] = `https://images.chesscomfiles.com/chess-themes/pieces/${targetStyle}/150/${c}${t}.png`;
+            }
+        }
+    }
+
+    // Initialize piece style on page load
+    buildPieceImg(localStorage.getItem('pieceStyle'));
+
+    function updatePieceStyle(style) {
+        buildPieceImg(style);
+        
+        // Re-draw board pieces
+        if (typeof syncPieces === 'function') {
+            syncPieces();
+        }
+        
+        // Re-draw captured list pieces dynamically
+        document.querySelectorAll('.captured-img').forEach(img => {
+            const key = img.dataset.piece;
+            if (key && PIECE_IMG[key]) {
+                img.src = PIECE_IMG[key];
+            }
+        });
+    }
 
     const PIECE_NAMES = {
         'p': 'Pawn',
@@ -363,6 +389,8 @@
     let currentPuzzleFen = null;
     let puzzleAnalyzing = false;
     let stockfishWorker = null;
+    let stockfishEvalSeq = 0;
+    let stockfishActiveReject = null;
 
     let hintLevel = 0;
 
@@ -550,9 +578,30 @@
         if (evaluationCache[fen]) {
             return Promise.resolve(evaluationCache[fen]);
         }
-        return new Promise((resolve) => {
+
+        // Cancel previous request if one is active to avoid leaks and settle the promise
+        if (stockfishActiveReject) {
+            try {
+                stockfishActiveReject(new Error("Evaluation superseded"));
+            } catch (e) {
+                console.error("Error settling superseded evaluation:", e);
+            }
+            stockfishActiveReject = null;
+        }
+
+        // Stop the current computation of the worker immediately
+        if (stockfishWorker) {
+            stockfishWorker.postMessage('stop');
+        }
+
+        stockfishEvalSeq++;
+        const currentEvalId = stockfishEvalSeq;
+
+        return new Promise((resolve, reject) => {
+            stockfishActiveReject = reject;
             initStockfish();
 
+            const activeWorker = stockfishWorker;
             let scoreType = 'cp';
             let scoreValue = 0;
 
@@ -565,17 +614,28 @@
                 }
 
                 if (line.startsWith('bestmove')) {
-                    stockfishWorker.removeEventListener('message', onMessage);
-                    const result = { type: scoreType, value: scoreValue };
-                    evaluationCache[fen] = result;
-                    resolve(result);
+                    if (activeWorker) {
+                        activeWorker.removeEventListener('message', onMessage);
+                    }
+                    if (currentEvalId === stockfishEvalSeq) {
+                        stockfishActiveReject = null;
+                        const result = { type: scoreType, value: scoreValue };
+                        evaluationCache[fen] = result;
+                        resolve(result);
+                    } else {
+                        reject(new Error("Evaluation superseded"));
+                    }
                 }
             };
 
-            stockfishWorker.addEventListener('message', onMessage);
-            stockfishWorker.postMessage('ucinewgame');
-            stockfishWorker.postMessage(`position fen ${fen}`);
-            stockfishWorker.postMessage('go depth 6 movetime 100');
+            if (activeWorker) {
+                activeWorker.addEventListener('message', onMessage);
+                activeWorker.postMessage('ucinewgame');
+                activeWorker.postMessage(`position fen ${fen}`);
+                activeWorker.postMessage('go depth 6 movetime 100');
+            } else {
+                reject(new Error("Worker not initialized"));
+            }
         });
     }
 
@@ -590,6 +650,89 @@
             }
         } else {
             return -value || 0;
+        }
+    }
+
+    function updateEvalBarVisibility() {
+        if (!evalBarContainer) return;
+        const isPuzzle = dailyPuzzleMode;
+        const show = (gameMode === 'ai' || gameMode === 'analysis' || replayMode) && !isPuzzle;
+        if (show) {
+            document.documentElement.classList.add('has-eval-bar');
+            if (flipped) {
+                evalBarContainer.classList.add('flipped');
+            } else {
+                evalBarContainer.classList.remove('flipped');
+            }
+        } else {
+            document.documentElement.classList.remove('has-eval-bar');
+        }
+    }
+
+    function updateEvalBar(evalResult, fen) {
+        if (!evalBarWhite || !evalBarScore) return;
+        let percentage = 50;
+        let displayLabel = '0.0';
+        if (evalResult) {
+            const type = evalResult.type;
+            const value = evalResult.value;
+            const sideToMove = fen ? fen.split(' ')[1] : 'w';
+            if (type === 'mate') {
+                let isWhiteMate = false;
+                if (sideToMove === 'w') {
+                    isWhiteMate = value > 0;
+                } else {
+                    isWhiteMate = value < 0;
+                }
+                displayLabel = `M${Math.abs(value)}`;
+                percentage = isWhiteMate ? 100 : 0;
+            } else {
+                let cp = value;
+                if (sideToMove === 'b') {
+                    cp = -cp;
+                }
+                const rawScore = cp / 100;
+                displayLabel = (rawScore >= 0 ? '+' : '') + rawScore.toFixed(1);
+                const val = 2 / (1 + Math.exp(-0.4 * rawScore)) - 1;
+                percentage = 50 + 50 * val;
+            }
+        }
+        evalBarWhite.style.height = `${percentage}%`;
+        evalBarScore.textContent = displayLabel;
+        const isWhiteAdvantage = percentage >= 50;
+        evalBarScore.style.top = '';
+        evalBarScore.style.bottom = '';
+        if (!flipped) {
+            if (isWhiteAdvantage) {
+                evalBarScore.style.bottom = '8px';
+                evalBarScore.style.color = '#1a1a2e';
+            } else {
+                evalBarScore.style.top = '8px';
+                evalBarScore.style.color = '#ffffff';
+            }
+        } else {
+            if (isWhiteAdvantage) {
+                evalBarScore.style.top = '8px';
+                evalBarScore.style.color = '#1a1a2e';
+            } else {
+                evalBarScore.style.bottom = '8px';
+                evalBarScore.style.color = '#ffffff';
+            }
+        }
+    }
+
+    async function triggerPositionEvaluation() {
+        if (!evalBarContainer || !document.documentElement.classList.contains('has-eval-bar')) {
+            return;
+        }
+        const currentFen = liveFen;
+        try {
+            const result = await getStockfishEval(currentFen);
+            if (liveFen === currentFen) {
+                updateEvalBar(result, currentFen);
+            }
+        } catch (e) {
+            console.error("Evaluation error:", e);
         }
     }
 
@@ -725,7 +868,7 @@
 
     let playerColor = 'white';
     let flipped = false;
-    let autoFlip = false;
+    let autoFlip = localStorage.getItem('autoFlip') === 'true';
 
     const sounds = {
         move: new Audio(`${SOUND_BASE_URL}move.wav`),
@@ -854,6 +997,9 @@
     const copyFenBtn = document.getElementById('copyFenBtn');
     const copyPgnBtn = document.getElementById('copyPgnBtn');
     const muteBtn = document.getElementById('muteBtn');
+    const evalBarContainer = document.getElementById('evalBarContainer');
+    const evalBarWhite = document.getElementById('evalBarWhite');
+    const evalBarScore = document.getElementById('evalBarScore');
 
     const welcomeOverlay = document.getElementById('welcomeOverlay');
     const welcomeResumeBtn = document.getElementById('welcomeResumeBtn');
@@ -959,6 +1105,9 @@
     let aiRequestSeq = 0; // Sequence token to cancel stale AI responses
     let analysisRequestSeq = 0; // Sequence token to cancel stale analysis responses
     const DEFAULT_START_FEN = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1';
+    // Tracks the full FEN of the current live position so legal moves can be
+    // computed on the client without a server round-trip (Issue #1445).
+    let liveFen = DEFAULT_START_FEN;
     let gameFens = [];
     let stepperIndex = 0;
     let viewingPastState = false;
@@ -1408,7 +1557,7 @@
         }
 
         board = parseBoard(data.board);
-        console.log("SERVER DATA ON AI MOVE:", data);
+        if (data.fen) liveFen = data.fen;
         turn = data.current_turn;
         whiteTime = data.white_time;
         blackTime = data.black_time;
@@ -1486,6 +1635,16 @@
         if (!welcomeOverlay.classList.contains('active')) {
             queueAIMoveIfNeeded();
         }
+
+        if (data.day_streak !== undefined) {
+            const streakCounter = document.getElementById("streak-counter");
+            const streakCount = document.getElementById("streak-count");
+            if (streakCounter && streakCount) {
+                streakCount.textContent = data.day_streak;
+                streakCounter.style.display = "block";
+            }
+        }
+        triggerPositionEvaluation();
     }
 
     function updatePlayerNames(data) {
@@ -1566,6 +1725,7 @@
     BOARD RENDERING
     ========================================================== */
     function buildBoard() {
+        updateEvalBarVisibility();
         const bc = document.querySelector('.board-container');
         if (bc) bc.classList.toggle('flipped', flipped);
         boardEl.innerHTML = '';
@@ -1795,6 +1955,57 @@
     /* ==========================================================
     SELECTION & MOVES
     ========================================================== */
+
+    /**
+     * Convert a chess.js square label (e.g. "e4") to board array indices.
+     * board[0][0] == a8, board[7][7] == h1.
+     */
+    function squareLabelToRowCol(square) {
+        const file = square.charCodeAt(0) - 97; // 'a'=0 … 'h'=7
+        const rank = parseInt(square[1], 10);    // 1–8
+        const row  = 8 - rank;                   // rank 8 → row 0
+        return { row, col: file };
+    }
+
+    /**
+     * Compute legal moves for the piece at (r, c) using the chess.js library
+     * that is already loaded on the page.  Returns an array of
+     * { row, col, is_capture, is_promotion } objects — the same shape that
+     * /api/valid-moves/ returns — so the rest of the UI is unchanged.
+     *
+     * Returns null if chess.js is not available so callers can fall back.
+     */
+    function computeLegalMovesClient(r, c) {
+        if (!window.Chess) return null;
+        try {
+            const chess = new window.Chess(liveFen);
+            const fromSquare = getSquareLabel(r, c); // e.g. "e2"
+            const moves = chess.moves({ square: fromSquare, verbose: true });
+            if (!moves) return null;
+
+            const seen = new Set();
+            return moves
+                .filter(m => {
+                    if (seen.has(m.to)) return false;
+                    seen.add(m.to);
+                    return true;
+                })
+                .map(m => {
+                    const { row, col } = squareLabelToRowCol(m.to);
+                    return {
+                        row,
+                        col,
+                        is_capture:   m.captured !== undefined,
+                        is_promotion: m.promotion !== undefined,
+                    };
+                });
+        } catch (e) {
+            // Unexpected chess.js error — caller will fall back to the API.
+            console.warn('computeLegalMovesClient error:', e);
+            return null;
+        }
+    }
+
     async function selectPiece(r, c) {
         const isPremoveMode = gameMode === 'ai' && turn !== playerColor;
         const vBoard = isPremoveMode ? getVirtualBoard() : board;
@@ -1816,11 +2027,18 @@
             return;
         }
 
-        // NORMAL MOVE LOGIC
+        // NORMAL MOVE LOGIC — try client-side first (Issue #1445)
+        const clientMoves = computeLegalMovesClient(r, c);
+        if (clientMoves !== null) {
+            // Instant: no network request needed.
+            hints = clientMoves;
+            refreshHighlights();
+            return;
+        }
+
+        // Fallback: chess.js unavailable — ask the server.
         const data = await get(`/api/valid-moves/?row=${r}&col=${c}`);
-
         hints = data.valid_moves || [];
-
         refreshHighlights();
     }
     function toggleSquareHighlight(r, c) {
@@ -1963,8 +2181,26 @@
             showStatus('Unable to reconnect. Please refresh.', true);
         }
         reconnecting = false;
-    } async function executeMove(fr, fc, tr, tc, promotionPiece, skipAnimation = false) {
+    }
+    
+    async function executeMove(fr, fc, tr, tc, promotionPiece, skipAnimation = false) {
         try {
+            // Opening Trainer validation (BEFORE backend update)
+            if (typeof openingTrainerMode !== 'undefined' && openingTrainerMode) {
+                const expectedMove = openingTrainerSteps[currentTrainerStep]?.expected_move;
+                if (expectedMove) {
+                    const playedMove =
+                        `${String.fromCharCode(97 + fc)}${8 - fr}` +
+                        `${String.fromCharCode(97 + tc)}${8 - tr}`;
+
+                    if (playedMove.toLowerCase() !== expectedMove.toLowerCase()) {
+                        showStatus(`Incorrect move. Expected: ${expectedMove}`, true);
+                        deselect();
+                        return { success: false, message: 'Incorrect move' };
+                    }
+                }
+            }
+
             const body = {
                 from_row: fr, from_col: fc,
                 to_row: tr, to_col: tc,
@@ -1973,37 +2209,12 @@
 
             const data = await post('/api/move/', body);
 
-            // Opening Trainer validation
-            if (typeof openingTrainerMode !== 'undefined' && openingTrainerMode) {
-                    const expectedMove =
-                    openingTrainerSteps[currentTrainerStep]?.expected_move;
-
-                const playedMove =
-                    `${toSquare(fr, fc)}-${toSquare(tr, tc)}`;
-
-                if (
-                    playedMove.toLowerCase() !== expectedMove.toLowerCase()
-                ) {
-                    showStatus(
-                        `Incorrect move. Expected: ${expectedMove}`,
-                        true
-                    );
-
-                    deselect();
-                    return;
-                }
-
+            // Advance Opening Trainer step after successful backend move
+            if (typeof openingTrainerMode !== 'undefined' && openingTrainerMode && data.valid) {
                 currentTrainerStep++;
-                if (
-                    currentTrainerStep >=
-                    openingTrainerSteps.length
-                ) {
+                if (currentTrainerStep >= openingTrainerSteps.length) {
                     openingTrainerMode = false;
-
-                    showStatus(
-                        "Opening sequence completed!",
-                        false
-                    );
+                    showStatus("Opening sequence completed!", false);
                 }
             }
 
@@ -2012,6 +2223,7 @@
                 playSound(data);
                 if (!skipAnimation) await animateMove(fr, fc, tr, tc);
                 board = parseBoard(data.board);
+                if (data.fen) liveFen = data.fen;
                 turn = data.current_turn;
 
                 const hasThreefoldWarning = data.threefold_warning;
@@ -2046,18 +2258,22 @@
 
                             const streak = updatePuzzleStreak();
                             updateStreakDisplay();
-                            showConfirm(
-                                "🎉 Puzzle Solved!",
-                                `🔥 Current Streak: ${streak}<br> 
-                                                    🏆 Best Streak: ${getPuzzleStreak().longestStreak}<br>
-                                                    Come back tomorrow for a new challenge.`,
-                                () => {
-                                    gameLayout.style.visibility = "hidden";
-                                    welcomeOverlay.classList.add("active");
-                                },
-                                "#f0c040"
-                            );
-                            return;
+                            if (data.game_status === 'checkmate') {
+                                // Transition to standard game-over overlay for checkmates
+                            } else {
+                                showConfirm(
+                                    "🎉 Puzzle Solved!",
+                                    `🔥 Current Streak: ${streak}<br> 
+                                                        🏆 Best Streak: ${getPuzzleStreak().longestStreak}<br>
+                                                        Come back tomorrow for a new challenge.`,
+                                    () => {
+                                        gameLayout.style.visibility = "hidden";
+                                        welcomeOverlay.classList.add("active");
+                                    },
+                                    "#f0c040"
+                                );
+                                return;
+                            }
                         }
                     } else {
                         // Start Stockfish validation for alternative moves
@@ -2079,17 +2295,31 @@
                                     if (puzzleMoveIndex >= currentPuzzle.solution.length) {
                                         const streak = updatePuzzleStreak();
                                         updateStreakDisplay();
-                                        showConfirm(
-                                            "🎉 Puzzle Solved!",
-                                            `🔥 Current Streak: ${streak}<br> 
-                                                                🏆 Best Streak: ${getPuzzleStreak().longestStreak}<br>
-                                                                Come back tomorrow for a new challenge.`,
-                                            () => {
-                                                gameLayout.style.visibility = "hidden";
-                                                welcomeOverlay.classList.add("active");
-                                            },
-                                            "#f0c040"
-                                        );
+                                        if (data.game_status === 'checkmate') {
+                                            lastMove = { from: [fr, fc], to: [tr, tc] };
+                                            whiteTime = data.white_time;
+                                            blackTime = data.black_time;
+                                            updatePlayerNames(data);
+                                            updateTurn();
+                                            updateMoves(data.move_history);
+                                            updateCaptured(data.captured_pieces);
+                                            syncPieces();
+                                            renderClocks();
+                                            updateMaterialUI(board);
+                                            return endGame('checkmate', turn).catch(e => console.error("Error in endGame:", e));
+                                        } else {
+                                            showConfirm(
+                                                "🎉 Puzzle Solved!",
+                                                `🔥 Current Streak: ${streak}<br> 
+                                                                    🏆 Best Streak: ${getPuzzleStreak().longestStreak}<br>
+                                                                    Come back tomorrow for a new challenge.`,
+                                                () => {
+                                                    gameLayout.style.visibility = "hidden";
+                                                    welcomeOverlay.classList.add("active");
+                                                },
+                                                "#f0c040"
+                                            );
+                                        }
                                     }
                                 } else {
                                     showConfirm(
@@ -2171,6 +2401,8 @@
                     if (a11yMsg) announceMove(a11yMsg);
                 }
 
+                triggerPositionEvaluation();
+
                 if (gameMode === 'ai' && turn !== playerColor && !gameOver) {
                     requestAIMove();
                 }
@@ -2233,8 +2465,54 @@
             if (data.valid) {
                 playSound(data);
                 const mv = data.ai_move;
+                
+                if (gameMode === 'analysis' && data.ai_move.predicted_responses) {
+                    // Issue #1630: Show predicted responses in Analysis Mode
+                    const predPanel = document.getElementById('aiPredictionPanel');
+                    const predSuggestedMove = document.getElementById('predSuggestedMove');
+                    const predResponsesList = document.getElementById('predResponsesList');
+                    
+                    if (predPanel && predSuggestedMove && predResponsesList) {
+                        const formatEval = (val) => {
+                            if (val === undefined || val === null) return '';
+                            const v = (val / 100).toFixed(2);
+                            return `(${v > 0 ? '+' + v : v})`;
+                        };
+
+                        const moveText = mv.notation || getSquareLabel(mv.to_row, mv.to_col);
+                        predSuggestedMove.textContent = '';
+                        const smStrong = document.createElement('strong');
+                        smStrong.textContent = moveText;
+                        predSuggestedMove.appendChild(smStrong);
+                        predSuggestedMove.appendChild(document.createTextNode(` ${formatEval(mv.eval)}`));
+
+                        predResponsesList.textContent = '';
+                        if (data.ai_move.predicted_responses.length === 0) {
+                            const li = document.createElement('li');
+                            li.textContent = 'No opponent response available. The position may be terminal.';
+                            predResponsesList.appendChild(li);
+                        } else {
+                            data.ai_move.predicted_responses.forEach((resp, index) => {
+                                const li = document.createElement('li');
+                                const respStrong = document.createElement('strong');
+                                respStrong.textContent = `${index + 1}. ${resp.notation}`;
+                                li.appendChild(respStrong);
+                                li.appendChild(document.createTextNode(` ${formatEval(resp.eval)}`));
+                                li.style.marginBottom = '5px';
+                                predResponsesList.appendChild(li);
+                            });
+                        }
+                        
+                        predPanel.style.display = 'block';
+                    }
+                } else {
+                    const predPanel = document.getElementById('aiPredictionPanel');
+                    if (predPanel) predPanel.style.display = 'none';
+                }
+
                 await animateMove(mv.from_row, mv.from_col, mv.to_row, mv.to_col);
                 board = parseBoard(data.board);
+                if (data.fen) liveFen = data.fen;
                 turn = data.current_turn;
                 if (data.threefold_warning) {
                     showStatus(
@@ -2288,6 +2566,8 @@
                         }
                     }
                     if (a11yMsg) announceMove(a11yMsg);
+
+                    triggerPositionEvaluation();
 
                     // Trigger queued premove if it exists
                     if (premoveQueue.length > 0) {
@@ -2466,6 +2746,14 @@
         if (typeof updateMaterialUI === 'function') {
             updateMaterialUI(board);
         }
+        updateEvalBarVisibility();
+        if (fen && !dailyPuzzleMode) {
+            getStockfishEval(fen).then(result => {
+                if (replayBoard && replayBoard.fen() === fen) {
+                    updateEvalBar(result, fen);
+                }
+            });
+        }
     }
     function goToReplayMove(index) {
 
@@ -2545,6 +2833,15 @@ function updateStepperUI() {
     if (fen) renderStepperPosition(fen);
 
     viewingPastState = (stepperIndex < gameFens.length - 1);
+
+    updateEvalBarVisibility();
+    if (fen && (gameMode === 'ai' || gameMode === 'analysis') && !dailyPuzzleMode) {
+        getStockfishEval(fen).then(result => {
+            if (gameFens[stepperIndex] === fen) {
+                updateEvalBar(result, fen);
+            }
+        });
+    }
 
     const resumeBtn = document.getElementById('resumeGameBtn');
     if (resumeBtn) resumeBtn.classList.toggle('hidden', !viewingPastState);
@@ -2673,8 +2970,10 @@ function updateStepperUI() {
         // Use createElement instead of innerHTML to prevent XSS and avoid DOM reflows
         const makeImg = (p) => {
             const img = document.createElement('img');
-            img.src = PIECE_IMG[pKey(p)];
+            const key = pKey(p);
+            img.src = PIECE_IMG[key];
             img.className = 'captured-img';
+            img.dataset.piece = key; // Save key for live piece style switching
             const name = pieceNames[p.toLowerCase()] || p;
             img.title = name;
             img.alt = name;
@@ -2701,31 +3000,39 @@ function updateStepperUI() {
     }
 
     function handleGameStatus(status, drawReason) {
-        if (dailyPuzzleMode) {
+        if (dailyPuzzleMode && status !== 'checkmate') {
             return false;
         }
         if (status === 'checkmate') {
-            endGame('checkmate', turn);
+            // pass 'turn' as the loserColor since the current turn's player got checkmated
+            endGame('checkmate', turn).catch(e => console.error("Error in endGame:", e));
             return true;
         }
         if (status === 'stalemate') {
-            endGame('stalemate', turn);
+            // pass 'turn' as the loserColor (unused for stalemate winner derivation)
+            endGame('stalemate', turn).catch(e => console.error("Error in endGame:", e));
             return true;
         }
         if (status === 'draw') {
-            endGame('draw', turn, drawReason);
+            endGame('draw', turn, drawReason).catch(e => console.error("Error in endGame:", e));
             return true;
         }
         return false;
     }
 
-    async function endGame(reason, color, drawReason = null) {
+    // loserColor always represents the losing side. Unused for winner derivation in draw/stalemate.
+    async function endGame(reason, loserColor, drawReason = null) {
         if (gameOver) return;
         gameOver = true;
-        const frozenPlayerColor = playerColor;
-        replayMode = true;
-        paused = true;
-        clearInterval(timerInterval);
+        
+        let title = '', message = '';
+        let isCelebration = false;
+
+        try {
+            const frozenPlayerColor = playerColor;
+            replayMode = true;
+            paused = true;
+            clearInterval(timerInterval);
 
         if (blindfoldMode) {
             blindfoldMode = false;
@@ -2735,11 +3042,11 @@ function updateStepperUI() {
         }
         updateThinkingDots();
 
-        let title = '', message = '';
+        title = ''; message = '';
 
         // Determine PVP or AI result relative to current player color
         const isWon = reason === 'checkmate' || reason === 'resign' || reason === 'timeout';
-        const winnerColor = isWon ? (color === 'white' ? 'black' : 'white') : null;
+        const winnerColor = isWon ? (loserColor === 'white' ? 'black' : 'white') : null;
 
         let resultState = 'draw'; // 'victory', 'defeat', 'draw'
         if (isWon) {
@@ -2750,7 +3057,7 @@ function updateStepperUI() {
             }
         }
 
-        let isCelebration = (resultState === 'victory');
+        isCelebration = (resultState === 'victory');
 
         // Update the session W/L/D tracker for this completed game
         if (gameMode === 'ai' || reason === 'draw' || reason === 'stalemate') {
@@ -2761,7 +3068,7 @@ function updateStepperUI() {
         playGameOverSound(reason, resultState);
 
         if (reason === 'checkmate') {
-            const winnerName = color === 'white' ? blackNameLabel.textContent : whiteNameLabel.textContent;
+            const winnerName = loserColor === 'white' ? (blackNameLabel?.textContent || 'Black') : (whiteNameLabel?.textContent || 'White');
             title = 'Checkmate';
             message = `${winnerName} Wins!`;
         } else if (reason === 'stalemate') {
@@ -2777,13 +3084,13 @@ function updateStepperUI() {
             };
             message = drawMessages[drawReason] || 'The game is a draw.';
         } else if (reason === 'resign') {
-            const winnerName = color === 'white' ? blackNameLabel.textContent : whiteNameLabel.textContent;
-            const loserName = color === 'white' ? whiteNameLabel.textContent : blackNameLabel.textContent;
+            const winnerName = loserColor === 'white' ? (blackNameLabel?.textContent || 'Black') : (whiteNameLabel?.textContent || 'White');
+            const loserName = loserColor === 'white' ? (whiteNameLabel?.textContent || 'White') : (blackNameLabel?.textContent || 'Black');
             title = 'Victory';
             message = `${loserName} resigned. ${winnerName} Wins!`;
         } else if (reason === 'timeout') {
-            const winnerName = color === 'white' ? blackNameLabel.textContent : whiteNameLabel.textContent;
-            const loserName = color === 'white' ? whiteNameLabel.textContent : blackNameLabel.textContent;
+            const winnerName = loserColor === 'white' ? (blackNameLabel?.textContent || 'Black') : (whiteNameLabel?.textContent || 'White');
+            const loserName = loserColor === 'white' ? (whiteNameLabel?.textContent || 'White') : (blackNameLabel?.textContent || 'Black');
             title = 'Timeout';
             message = `${loserName} ran out of time. ${winnerName} Wins!`;
         }
@@ -2814,14 +3121,11 @@ function updateStepperUI() {
             const spans = row.querySelectorAll('.move-white, .move-black');
             spans.forEach(span => {
                 const rawMove = span.textContent?.replace(/\s+/g, '')?.trim();
+                const move = rawMove?.replace(/[+#]/g, '');
+
                 if (rawMove && rawMove !== '...') {
                     rawAnalysisMoves.push(rawMove);
                 }
-                
-                const move = span.textContent
-                    ?.replace(/[+#]/g, '')
-                    ?.replace(/\s+/g, '')
-                    ?.trim();
 
                 if (move && move !== '...') {
                     console.log("Replay move added:", move);
@@ -2831,7 +3135,9 @@ function updateStepperUI() {
         });
 
         console.log("FINAL REPLAY MOVES:", replayMoves);
-        console.log("FINAL RAW MOVES:", rawAnalysisMoves);
+        if (typeof process === 'undefined' || process.env.NODE_ENV !== 'test') {
+            console.log("FINAL RAW MOVES:", rawAnalysisMoves);
+        }
 
         if (window.Chess) {
             replayBoard = new window.Chess();
@@ -2863,7 +3169,10 @@ function updateStepperUI() {
             }
         }
 
-        gameOverMessage.textContent = message;
+        const messageEl = gameOverMessage || document.getElementById('gameOverMessage');
+        if (messageEl) {
+            messageEl.textContent = message;
+        }
 
         // 2. Result Illustration injection
         const illustrationEl = document.getElementById('gameOverIllustration');
@@ -3223,41 +3532,49 @@ function updateStepperUI() {
             console.error("Failed to fetch post-game analysis", e);
         });
 
+        } catch (error) {
+            console.error("Error during endGame setup:", error);
+            if (!title) title = 'Game Over';
+            if (!message) message = 'The game has ended.';
+            isCelebration = false;
+        }
 
         // Delay the overlay and celebration effects by 0.5 seconds
         setTimeout(() => {
+            const overlayEl = gameOverOverlay || document.getElementById('gameOverOverlay');
+            if (!overlayEl) return;
             // Add celebration effects for wins
             if (isCelebration) {
-                gameOverOverlay.classList.add('game-over-celebration');
+                overlayEl.classList.add('game-over-celebration');
                 createConfetti();
                 createSparkles();
             } else {
-                gameOverOverlay.classList.remove('game-over-celebration');
+                overlayEl.classList.remove('game-over-celebration');
             }
 
             // Prepare for fade-in animation
-            gameOverOverlay.style.transition = 'opacity 0.5s ease-in-out';
-            gameOverOverlay.style.opacity = '0';
-            gameOverOverlay.classList.add('active');
+            overlayEl.style.transition = 'opacity 0.5s ease-in-out';
+            overlayEl.style.opacity = '0';
+            overlayEl.classList.add('active');
 
             // Trigger fade-in after a short delay
             setTimeout(() => {
-                gameOverOverlay.style.opacity = '1';
+                if (overlayEl) overlayEl.style.opacity = '1';
             }, 500);
         }, 500);
 
         showStatus(title + ': ' + message, false);
 
         // Clean a11y announcement
-        const winnerColorText = color === 'white' ? 'Black' : 'White';
+        const winnerColorText = loserColor === 'white' ? 'Black' : 'White';
         let cleanMsg = '';
         if (reason === 'checkmate') {
             cleanMsg = `Checkmate. ${winnerColorText} wins!`;
         } else if (reason === 'resign') {
-            const resigningColorText = color === 'white' ? 'White' : 'Black';
+            const resigningColorText = loserColor === 'white' ? 'White' : 'Black';
             cleanMsg = `${resigningColorText} has resigned. ${winnerColorText} wins!`;
         } else if (reason === 'timeout') {
-            const timeoutColorText = color === 'white' ? 'White' : 'Black';
+            const timeoutColorText = loserColor === 'white' ? 'White' : 'Black';
             cleanMsg = `${timeoutColorText} ran out of time. ${winnerColorText} wins!`;
         } else if (reason === 'stalemate') {
             cleanMsg = 'Game drawn by stalemate.';
@@ -3874,6 +4191,7 @@ function updateStepperUI() {
 
         board = d.board;
         turn = d.current_turn;
+        if (d.fen) liveFen = d.fen;
         paused = false;
         gameOver = false;
         whiteAlertFired = false;
@@ -4741,111 +5059,106 @@ function updateStepperUI() {
     const sanMoveBtn = document.getElementById('sanMoveBtn');
     const sanMoveError = document.getElementById('sanMoveError');
 
-    async function handleSanMove() {
-        if (!sanMoveInput) return;
-        let san = sanMoveInput.value.trim();
-        if (!san) return;
-        
-        if (sanMoveError) sanMoveError.style.display = 'none';
+    let isSanMoveInFlight = false;  
 
-        if (paused || gameOver) {
-            if (sanMoveError) {
-                sanMoveError.textContent = 'Game is not active';
-                sanMoveError.style.display = 'block';
-            }
-            flashBoard();
-            return;
+async function handleSanMove() {
+    if (!sanMoveInput) return;
+    if (isSanMoveInFlight) return;
+    let san = sanMoveInput.value.trim();
+    if (!san) return;
+    
+    if (sanMoveError) sanMoveError.style.display = 'none';
+
+    if (paused || gameOver) {
+        if (sanMoveError) {
+            sanMoveError.textContent = 'Game is not active';
+            sanMoveError.style.display = 'block';
         }
-
-        if (gameMode === 'ai' && turn !== playerColor) {
-            if (sanMoveError) {
-                sanMoveError.textContent = 'Not your turn';
-                sanMoveError.style.display = 'block';
-            }
-            flashBoard();
-            return;
-        }
-
-        if (sanMoveBtn) sanMoveBtn.disabled = true;
-
-        try {
-            const data = await get('/api/state/');
-            if (!data.fen) throw new Error("No FEN");
-            
-            if (!window.Chess) throw new Error("Chess engine not loaded");
-            const chess = new window.Chess(data.fen);
-            
-            // Minimal normalization: fix casing so chess.js can parse user input
-            // Rules:
-            //   - Castling variants: map to standard O-O / O-O-O
-            //   - Uppercase [NBRQK]: definite piece move — uppercase first char, lowercase body, preserve suffix
-            //   - Lowercase [nrqk]: definite piece move (n,r,q,k are not valid pawn files) — same as above
-            //   - Lowercase 'b' and all [a-h]/[A-H]: pawn move — lowercase entire body, preserve suffix
-            // Promotion suffix (=Q/=R etc) is always uppercased; check/checkmate (+/#) is preserved as-is.
-            if (/^[0oO]-[0oO]-[0oO]$/i.test(san)) {
-                san = 'O-O-O';
-            } else if (/^[0oO]-[0oO]$/i.test(san)) {
-                san = 'O-O';
-            } else {
-                // Strip trailing check/checkmate and promotion to preserve them exactly
-                const promoMatch = san.match(/=([qrbnQRBN])([+#]?)$/);
-                const suffix = promoMatch
-                    ? `=${promoMatch[1].toUpperCase()}${promoMatch[2]}`
-                    : san.match(/[+#]$/) ? san.slice(-1) : '';
-                const body = promoMatch
-                    ? san.slice(0, san.lastIndexOf('='))
-                    : suffix ? san.slice(0, -1) : san;
-
-                if (/^[NBRQK]/.test(san) || /^[nrqk]/.test(san)) {
-                    // Piece move: uppercase first char, lowercase rest of body
-                    san = body.charAt(0).toUpperCase() + body.slice(1).toLowerCase() + suffix;
-                } else if (/^[a-h]/i.test(san)) {
-                    // Pawn move (files a-h, including lowercase 'b'): fully lowercase body
-                    san = body.toLowerCase() + suffix;
-                }
-            }
-            
-            const moveObj = chess.move(san);
-            if (!moveObj) {
-                if (sanMoveError) {
-                    sanMoveError.textContent = 'Invalid or illegal move notation';
-                    sanMoveError.style.display = 'block';
-                }
-                flashBoard();
-                if (sanMoveBtn) sanMoveBtn.disabled = false;
-                return;
-            }
-            
-            const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
-            const ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
-            
-            const fc = files.indexOf(moveObj.from[0]);
-            const fr = ranks.indexOf(moveObj.from[1]);
-            const tc = files.indexOf(moveObj.to[0]);
-            const tr = ranks.indexOf(moveObj.to[1]);
-            const promo = moveObj.promotion || null;
-            
-            const result = await executeMove(fr, fc, tr, tc, promo);
-            if (result && result.success) {
-                sanMoveInput.value = '';
-                sanMoveInput.blur();
-            } else {
-                if (sanMoveError) {
-                    sanMoveError.textContent = (result && result.message) ? result.message : 'Move rejected';
-                    sanMoveError.style.display = 'block';
-                }
-                flashBoard();
-            }
-        } catch (err) {
-            console.error('SAN Move Error:', err);
-            if (sanMoveError) {
-                sanMoveError.textContent = 'Error processing move';
-                sanMoveError.style.display = 'block';
-            }
-        } finally {
-            if (sanMoveBtn) sanMoveBtn.disabled = false;
-        }
+        flashBoard();
+        return;
     }
+
+    if (gameMode === 'ai' && turn !== playerColor) {
+        if (sanMoveError) {
+            sanMoveError.textContent = 'Not your turn';
+            sanMoveError.style.display = 'block';
+        }
+        flashBoard();
+        return;
+    }
+
+    isSanMoveInFlight = true;
+    if (sanMoveBtn) sanMoveBtn.disabled = true;
+
+    try {
+        const data = await get('/api/state/');
+        if (!data.fen) throw new Error("No FEN");
+        
+        if (!window.Chess) throw new Error("Chess engine not loaded");
+        const chess = new window.Chess(data.fen);
+        
+        if (/^[0oO]-[0oO]-[0oO]$/i.test(san)) {
+            san = 'O-O-O';
+        } else if (/^[0oO]-[0oO]$/i.test(san)) {
+            san = 'O-O';
+        } else {
+            const promoMatch = san.match(/=([qrbnQRBN])([+#]?)$/);
+            const suffix = promoMatch
+                ? `=${promoMatch[1].toUpperCase()}${promoMatch[2]}`
+                : san.match(/[+#]$/) ? san.slice(-1) : '';
+            const body = promoMatch
+                ? san.slice(0, san.lastIndexOf('='))
+                : suffix ? san.slice(0, -1) : san;
+
+            if (/^[NBRQK]/.test(san) || /^[nrqk]/.test(san)) {
+                san = body.charAt(0).toUpperCase() + body.slice(1).toLowerCase() + suffix;
+            } else if (/^[a-h]/i.test(san)) {
+                san = body.toLowerCase() + suffix;
+            }
+        }
+        
+        const moveObj = chess.move(san);
+        if (!moveObj) {
+            if (sanMoveError) {
+                sanMoveError.textContent = 'Invalid or illegal move notation';
+                sanMoveError.style.display = 'block';
+            }
+            flashBoard();
+            if (sanMoveBtn) sanMoveBtn.disabled = false;
+            return;
+        }
+        
+        const files = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
+        const ranks = ['8', '7', '6', '5', '4', '3', '2', '1'];
+        
+        const fc = files.indexOf(moveObj.from[0]);
+        const fr = ranks.indexOf(moveObj.from[1]);
+        const tc = files.indexOf(moveObj.to[0]);
+        const tr = ranks.indexOf(moveObj.to[1]);
+        const promo = moveObj.promotion || null;
+        
+        const result = await executeMove(fr, fc, tr, tc, promo);
+        if (result && result.success) {
+            sanMoveInput.value = '';
+            sanMoveInput.blur();
+        } else {
+            if (sanMoveError) {
+                sanMoveError.textContent = (result && result.message) ? result.message : 'Move rejected';
+                sanMoveError.style.display = 'block';
+            }
+            flashBoard();
+        }
+    } catch (err) {
+        console.error('SAN Move Error:', err);
+        if (sanMoveError) {
+            sanMoveError.textContent = 'Error processing move';
+            sanMoveError.style.display = 'block';
+        }
+    } finally {
+        isSanMoveInFlight = false;
+        if (sanMoveBtn) sanMoveBtn.disabled = false;
+    }
+}
 
     if (sanMoveInput) {
         sanMoveInput.addEventListener('keydown', (e) => {
@@ -5135,6 +5448,164 @@ function updateStepperUI() {
 
     if (leaveConfirmNo) leaveConfirmNo.addEventListener('click', closeLeaveConfirm);
 
+    // ========== Theme & Settings Modal Logic ==========
+    const themeSettingsModal = document.getElementById('themeSettingsModal');
+    const openThemeModalBtn = document.getElementById('openThemeModalBtn');
+    const closeThemeModalBtn = document.getElementById('closeThemeModalBtn');
+    const saveThemeSettingsBtn = document.getElementById('saveThemeSettingsBtn');
+    let themeModalFocusReturn = null;
+
+    if (openThemeModalBtn && themeSettingsModal) {
+        openThemeModalBtn.onclick = () => {
+            themeModalFocusReturn = document.activeElement;
+
+            // 1. Sync Board Theme radio
+            const currentBoardTheme = document.documentElement.getAttribute('data-board-theme') || 'classic';
+            const boardThemeRadio = themeSettingsModal.querySelector(`input[name="boardThemeRadio"][value="${currentBoardTheme}"]`);
+            if (boardThemeRadio) boardThemeRadio.checked = true;
+
+            // Sync Piece Style radio
+            const currentPieceStyle = localStorage.getItem('pieceStyle') || 'neo';
+            const pieceStyleRadio = themeSettingsModal.querySelector(`input[name="pieceStyleRadio"][value="${currentPieceStyle}"]`);
+            if (pieceStyleRadio) pieceStyleRadio.checked = true;
+
+            // 2. Sync Sound Toggle
+            const soundToggle = document.getElementById('modalSoundToggle');
+            if (soundToggle) soundToggle.checked = soundEnabled;
+
+            // 3. Sync Coordinates Toggle
+            const coordsToggle = document.getElementById('modalCoordsToggle');
+            const coordsEnabled = localStorage.getItem('showCoordinates') !== 'false';
+            if (coordsToggle) coordsToggle.checked = coordsEnabled;
+
+            // 4. Sync Auto-Flip Toggle
+            const autoFlipToggle = document.getElementById('modalAutoFlipToggle');
+            if (autoFlipToggle) autoFlipToggle.checked = autoFlip;
+
+            // Open the Modal
+            themeSettingsModal.classList.add('active');
+            themeSettingsModal.setAttribute('aria-hidden', 'false');
+
+            // Move focus to modal close button
+            setTimeout(() => {
+                if (closeThemeModalBtn) {
+                    closeThemeModalBtn.focus();
+                }
+            }, 50);
+        };
+    }
+
+    const closeThemeModal = () => {
+        if (themeSettingsModal) {
+            themeSettingsModal.classList.remove('active');
+            themeSettingsModal.setAttribute('aria-hidden', 'true');
+            if (themeModalFocusReturn && typeof themeModalFocusReturn.focus === 'function') {
+                themeModalFocusReturn.focus();
+            }
+            themeModalFocusReturn = null;
+        }
+    };
+
+    if (closeThemeModalBtn) closeThemeModalBtn.onclick = closeThemeModal;
+    if (saveThemeSettingsBtn) saveThemeSettingsBtn.onclick = closeThemeModal;
+
+    // Handle Escape key to close modal
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && themeSettingsModal && themeSettingsModal.classList.contains('active')) {
+            closeThemeModal();
+        }
+    });
+
+    if (themeSettingsModal) {
+        // Close modal on click outside (backdrop)
+        themeSettingsModal.addEventListener('click', (e) => {
+            if (e.target === themeSettingsModal) {
+                closeThemeModal();
+            }
+        });
+
+        // Handle Board Theme swatch switches
+        const boardRadios = themeSettingsModal.querySelectorAll('input[name="boardThemeRadio"]');
+        boardRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                const selectedTheme = radio.value;
+                document.documentElement.setAttribute('data-board-theme', selectedTheme);
+                localStorage.setItem('boardTheme', selectedTheme);
+                localStorage.setItem('chessBoardTheme', selectedTheme);
+                
+                // Keep any other .theme-btn elements synced (if any exist)
+                const originalThemeBtns = document.querySelectorAll('.theme-btn');
+                originalThemeBtns.forEach(btn => {
+                    if (btn.dataset.theme === selectedTheme) {
+                        btn.classList.add('active');
+                        btn.setAttribute('aria-pressed', 'true');
+                    } else {
+                        btn.classList.remove('active');
+                        btn.setAttribute('aria-pressed', 'false');
+                    }
+                });
+            });
+        });
+
+        // Handle Piece Style swatch switches
+        const pieceRadios = themeSettingsModal.querySelectorAll('input[name="pieceStyleRadio"]');
+        pieceRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                const selectedStyle = radio.value;
+                localStorage.setItem('pieceStyle', selectedStyle);
+                updatePieceStyle(selectedStyle);
+            });
+        });
+
+        // Handle Sound Toggle Switch
+        const soundToggle = document.getElementById('modalSoundToggle');
+        if (soundToggle) {
+            soundToggle.addEventListener('change', () => {
+                soundEnabled = soundToggle.checked;
+                localStorage.setItem('chessSoundEnabled', String(soundEnabled));
+                if (muteBtn) {
+                    muteBtn.textContent = soundEnabled ? '🔊 Sound On' : '🔇 Muted';
+                    muteBtn.setAttribute('aria-pressed', String(soundEnabled));
+                }
+            });
+        }
+
+        // Handle Coordinates Toggle Switch
+        const coordsToggle = document.getElementById('modalCoordsToggle');
+        if (coordsToggle) {
+            coordsToggle.addEventListener('change', () => {
+                const enabled = coordsToggle.checked;
+                localStorage.setItem('showCoordinates', String(enabled));
+                if (boardEl) {
+                    if (enabled) {
+                        boardEl.classList.remove('hide-coordinates');
+                    } else {
+                        boardEl.classList.add('hide-coordinates');
+                    }
+                }
+                const showCoordsBtn = document.getElementById('showCoordinatesCheckbox');
+                if (showCoordsBtn) showCoordsBtn.checked = enabled;
+            });
+        }
+
+        // Handle Auto-Flip Toggle Switch
+        const autoFlipToggle = document.getElementById('modalAutoFlipToggle');
+        if (autoFlipToggle) {
+            autoFlipToggle.addEventListener('change', () => {
+                autoFlip = autoFlipToggle.checked;
+                localStorage.setItem('autoFlip', String(autoFlip));
+                if (autoFlipBtn) {
+                    autoFlipBtn.textContent = 'Auto-Flip: ' + (autoFlip ? 'ON' : 'OFF');
+                    autoFlipBtn.style.background = autoFlip ? 'linear-gradient(135deg, #40c0f0, #2080d4)' : '';
+                }
+                if (autoFlip && gameMode === 'pvp') {
+                    flipped = (turn === 'black');
+                    buildBoard();
+                }
+            });
+        }
+    }
+
     // Theme Switcher
     function initThemeSwitcher() {
         const themeBtns = document.querySelectorAll('.theme-btn');
@@ -5238,7 +5709,8 @@ function updateStepperUI() {
     if (typeof module !== "undefined" && module.exports) {
         module.exports = { 
             pColor, getSquareLabel, formatTime, getPlayerScore, validateMoveWithStockfish, clearEvaluationCache,
-            onClick, onDragStart, onDrop, showPromoModal, hidePromoModal, onPromoChoice, toggleSquareHighlight, refreshHighlights, highlightCheck, startNewGame
+            onClick, onDragStart, onDrop, showPromoModal, hidePromoModal, onPromoChoice, toggleSquareHighlight, refreshHighlights, highlightCheck, startNewGame,
+            squareLabelToRowCol, computeLegalMovesClient, updatePieceStyle, PIECE_IMG, VALID_PIECE_STYLES
         };
     } else {
         loadGame();

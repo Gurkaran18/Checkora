@@ -118,7 +118,7 @@ body {
     color: #f0c040;
 }
 
-.theme-toggle {
+.header .theme-toggle {
     position: absolute;
     top: 0;
     right: 0;
@@ -133,7 +133,7 @@ body {
     transition: background 0.25s ease, color 0.25s ease, transform 0.25s ease;
 }
 
-.theme-toggle:hover {
+.header .theme-toggle:hover {
     background: rgba(255, 255, 255, 0.08);
 }
 
@@ -576,9 +576,17 @@ body {
     white-space: nowrap;
 }
 
-.session-score-tracker .score-win { color: #4ade80; }
-.session-score-tracker .score-loss { color: #f87171; }
-.session-score-tracker .score-draw { color: #f0c040; }
+.session-score-tracker .score-win {
+    color: var(--score-win, #4ade80);
+}
+
+.session-score-tracker .score-loss {
+    color: var(--score-loss, #f87171);
+}
+
+.session-score-tracker .score-draw {
+    color: var(--score-draw, #f0c040);
+}
 
 @media (max-width: 480px) {
     .session-score-tracker {
@@ -760,6 +768,61 @@ body {
 }
 
 
+/* ============================================================
+   Evaluation Bar
+   ============================================================ */
+.eval-bar-container {
+    display: none;
+    position: relative;
+    width: 24px;
+    height: calc(var(--square-size) * 8 + var(--board-border) * 2);
+    background: #1a1a2e; /* Dark theme card-like dark color for Black */
+    border: var(--board-border) solid #3d3222;
+    border-radius: 4px;
+    overflow: hidden;
+    flex-direction: column;
+    justify-content: flex-end; /* White at bottom by default */
+    margin-right: 8px;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+    box-sizing: border-box;
+}
+
+.eval-bar-white {
+    width: 100%;
+    height: 50%;
+    background: #FFF6D5; /* Matches classic light square */
+    transition: height 0.3s ease-in-out;
+}
+
+/* Flipped: White starts at top */
+.eval-bar-container.flipped {
+    justify-content: flex-start;
+}
+
+.eval-bar-score {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    font-weight: 700;
+    pointer-events: none;
+    z-index: 10;
+    transition: top 0.3s ease-in-out, bottom 0.3s ease-in-out, color 0.3s ease-in-out;
+}
+
+/* Global visibility triggers */
+:root.has-eval-bar {
+    --board-chrome: calc(var(--rank-label-width) + var(--board-border) * 2 + 12px + 32px);
+}
+
+.has-eval-bar .eval-bar-container {
+    display: flex;
+}
+
+.has-eval-bar .files {
+    margin-left: calc(var(--rank-label-width) + var(--board-border) + 32px);
+}
+
 .ranks {
     display: flex;
     flex-direction: column;
@@ -831,7 +894,7 @@ body {
     --layout-padding-x: clamp(10px, 1.5vw, 20px);
     --layout-padding-y: clamp(12px, 1.5vw, 20px);
     --panel-width: clamp(128px, 11vw, 196px);
-    --sidebar-width: 360px;
+    --sidebar-width: clamp(360px, 28vw, 440px);
     --rank-label-width: 1.35rem;
     --board-border: 3px;
     --board-chrome: calc(var(--rank-label-width) + var(--board-border) * 2 + 12px);
@@ -863,13 +926,33 @@ body {
 }
 
 /* Dark Theme */
+
 :root[data-board-theme="dark"] {
+
+    /* UI Theme */
+    --bg-dark: #0f0f1a;
+    --nav-bg: #12121f;
+    --card-bg: #16162a;
+    --card-border: #252545;
+    --card-hover: #1a1a35;
+
+    --text-primary: #d0d0d0;
+    --text-title: #ffffff;
+    --text-secondary: #aaaaaa;
+
+    --accent-gold: #f0c040;
+
+    /* Chess Board Theme */
+
     --sq-light: #b0b0b0;
     --sq-dark: #3a3a3a;
+
     --sq-selected-light: #5271ff;
     --sq-selected-dark: #1a36b8;
+
     --sq-last-light: #e6b800;
     --sq-last-dark: #b38f00;
+
     --move-dot: rgba(255, 255, 255, 0.35);
     --move-dot-hover: rgba(255, 255, 255, 0.65);
 }
@@ -3367,20 +3450,81 @@ body.blindfold-mode .capture-ring {
 .sidebar-container {
     width: 100%;
     min-width: 0;
-    max-width: var(--panel-width);
+    max-width: none;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    box-sizing: border-box;
+    align-content: start;
+}
+
+.sidebar-container > .card {
+    min-width: 0;
+}
+
+.sidebar-container > .status-card,
+.sidebar-container > #emotePanel {
+    grid-column: 1 / -1;
+}
+
+.sidebar-container > .move-history-card {
+    grid-column: 1 / 2;
+}
+
+.sidebar-utility-column {
+    grid-column: 2 / 3;
     display: flex;
     flex-direction: column;
     gap: 12px;
-    box-sizing: border-box;
+    min-width: 0;
+}
+
+/* Make the Board Theme box more compact at the bottom */
+.theme-card {
+    padding-bottom: 8px;
+    align-self: start;
+}
+
+.theme-card .theme-switcher {
+    margin-top: 6px;
+}
+
+.theme-card .preference-container {
+    margin-top: 8px;
+    padding-top: 8px;
+}
+
+/* Compact single-column control stack */
+.controls-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+}
+
+.controls-grid > * {
+    width: 100%;
+    min-width: 0;
+}
+
+.controls-grid .btn {
+    min-height: 42px;
+    padding: 8px 10px;
+    font-size: 0.78rem;
+    line-height: 1.15;
+    text-align: center;
+}
+
+.controls-grid-full {
+    grid-column: 1 / -1;
 }
 
 @media (max-width: 1024px) {
     .sidebar-container {
-        max-width: 500px;
-        flex-direction: row;
-        flex-wrap: wrap;
+        gap: 10px;
     }
-    .sidebar-container .card { flex: 1; min-width: 200px; }
+    .controls-grid {
+        gap: 6px;
+    }
 }
 
 .mobile-close-btn {
@@ -3414,6 +3558,26 @@ body.blindfold-mode .capture-ring {
         width: 100% !important;
         min-width: 0 !important;
     }
+    .sidebar-container > .status-card,
+    .sidebar-container > .move-history-card,
+    .sidebar-container > #emotePanel {
+        grid-column: auto;
+    }
+    .sidebar-utility-column {
+        grid-column: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        min-width: 0;
+    }
+    .controls-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    .controls-grid-full {
+        grid-column: auto;
+    }
     .sidebar-container.active {
         right: 0;
     }
@@ -3438,6 +3602,7 @@ body.blindfold-mode .capture-ring {
     flex-direction: column;
     overflow: hidden;
     min-height: 0;
+    min-height: 260px;
 }
 
 .move-history-card .moves-list {

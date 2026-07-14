@@ -145,6 +145,8 @@ jobs:
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: 🐍 Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
@@ -221,6 +223,8 @@ jobs:
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: 🔧 Verify g++ availability
         run: g++ --version
@@ -271,6 +275,8 @@ jobs:
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: 🐍 Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
@@ -306,7 +312,7 @@ jobs:
         run: |
           # set -o pipefail ensures test failures aren't swallowed by tee
           set -o pipefail
-          python manage.py test game.tests --verbosity=2 --parallel 2>&1 | tee test_output.txt
+          python manage.py test game --verbosity=2 --parallel 2>&1 | tee test_output.txt
 
       - name: 📋 Print test summary to Actions UI
         if: always()
@@ -354,6 +360,8 @@ jobs:
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: 🐍 Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
@@ -396,6 +404,8 @@ jobs:
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: 🐍 Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
@@ -415,7 +425,6 @@ jobs:
 
       - name: 🔒 Run pip-audit security scan
         run: |
-          pip install -r requirements.txt
           pip-audit \
             --requirement requirements.txt \
             --format=columns \
@@ -440,6 +449,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
@@ -500,6 +511,8 @@ jobs:
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: 🐍 Set up Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5

@@ -24,9 +24,10 @@ from django.utils import timezone
 from django.shortcuts import get_object_or_404
 from django.utils.http import (
     urlsafe_base64_encode,
-    urlsafe_base64_decode
+    urlsafe_base64_decode,
+    url_has_allowed_host_and_scheme
 )
-
+from django.core.paginator import Paginator
 from django.utils.encoding import (
     force_bytes,
     force_str
@@ -203,6 +204,11 @@ def record_game_result(request, mode, winner, reason, player_color='white', move
     )
     result.full_clean()
     result.save()
+
+    if user:
+        with transaction.atomic():
+            progress, _ = UserProgress.objects.select_for_update().get_or_create(user=user)
+            progress.update_streak()
 
     if user and mode == 'ai':
         update_player_rating(
@@ -519,7 +525,7 @@ def get_state(request):
         request.session['game']
     )
 
-    return JsonResponse({
+    response_data = {
         'board': game.board,
         'current_turn': game.current_turn,
         'white_time': game.white_time,
@@ -539,7 +545,13 @@ def get_state(request):
         'game_status': game.game_status,
         'draw_reason': game.draw_reason,
         'threefold_warning': game.threefold_warning,
-    })
+    }
+
+    if request.user.is_authenticated:
+        progress, _ = UserProgress.objects.get_or_create(user=request.user)
+        response_data['day_streak'] = progress.day_streak
+
+    return JsonResponse(response_data)
 
 
 @require_POST
@@ -582,6 +594,32 @@ def set_pause(request):
 @require_POST
 def ai_move(request):
     """Let the engine compute and play the best move for the current side."""
+    # Issue #1625: Rate-limit this endpoint to prevent computational DoS.
+    # Apply both a per-user limit (for authenticated sessions) and a per-IP
+    # limit (for anonymous or shared-IP scenarios), matching the pattern used
+    # in analyze_game_view.
+    window = getattr(settings, 'AI_MOVE_RATE_WINDOW_SECONDS', 60)
+    ip = get_client_ip(request)
+    ip_key = get_ai_move_rate_ip_key(ip)
+    ip_count = increment_counter(ip_key, timeout=window)
+    if ip_count > getattr(settings, 'AI_MOVE_IP_MAX_REQUESTS', 240):
+        response = JsonResponse(
+            {'error': 'Too many AI move requests. Please try again shortly.'},
+            status=429,
+        )
+        response['Retry-After'] = str(window)
+        return response
+    if request.user.is_authenticated:
+        user_key = get_ai_move_rate_user_key(request.user.id)
+        user_count = increment_counter(user_key, timeout=window)
+        if user_count > getattr(settings, 'AI_MOVE_USER_MAX_REQUESTS', 120):
+            response = JsonResponse(
+                {'error': 'Too many AI move requests. Please try again shortly.'},
+                status=429,
+            )
+            response['Retry-After'] = str(window)
+            return response
+
     game_data = request.session.get('game')
     if not game_data:
         err_msg = 'No active game.'
@@ -591,7 +629,7 @@ def ai_move(request):
 
     game = ChessGame.from_dict(game_data)
 
-    if game.mode != 'ai':
+    if game.mode not in ('ai', 'analysis'):
         err_msg = 'Not in AI mode.'
         return JsonResponse(
             {'valid': False, 'message': err_msg}, status=400
@@ -637,6 +675,60 @@ def ai_move(request):
         request.session['opening'] = ''
         request.session.modified = True
         best = game.get_ai_move(depth=depth)
+
+    # Issue #1630: Predict opponent responses in Analysis Mode
+    if best and game.mode == 'analysis':
+        try:
+            # Generate notation for the best move
+            best['notation'] = game._notation(
+                best['from_row'], best['from_col'],
+                best['to_row'], best['to_col'],
+                game.board[best['from_row']][best['from_col']],
+                game.board[best['to_row']][best['to_col']],
+                game.serialize_board(), game.serialize_castling_rights(), game._serialize_ep()
+            )
+
+            # Create a temporary copy
+            temp_game = ChessGame()
+            temp_game.board = temp_game._parse_board64(game.serialize_board())
+            temp_game.castling_rights = dict(game.castling_rights)
+            temp_game.current_turn = game.current_turn
+            temp_game.en_passant_target = game.en_passant_target
+            
+            # Apply the suggested move
+            temp_game.make_move(best['from_row'], best['from_col'], best['to_row'], best['to_col'])
+            
+            # Request opponent's responses
+            opp_resp = temp_game.get_ai_move(depth=depth)
+            
+            predicted_responses = []
+            if opp_resp and 'alts' in opp_resp:
+                predicted_responses.append({
+                    'notation': temp_game._notation(
+                        opp_resp['from_row'], opp_resp['from_col'], 
+                        opp_resp['to_row'], opp_resp['to_col'], 
+                        temp_game.board[opp_resp['from_row']][opp_resp['from_col']], 
+                        temp_game.board[opp_resp['to_row']][opp_resp['to_col']], 
+                        temp_game.serialize_board(), temp_game.serialize_castling_rights(), temp_game._serialize_ep()
+                    ),
+                    'eval': opp_resp.get('eval')
+                })
+                # Cap the alts before running the notation loop
+                for alt in opp_resp.get('alts', [])[:2]:
+                    predicted_responses.append({
+                        'notation': temp_game._notation(
+                            alt['from_row'], alt['from_col'], 
+                            alt['to_row'], alt['to_col'], 
+                            temp_game.board[alt['from_row']][alt['from_col']], 
+                            temp_game.board[alt['to_row']][alt['to_col']], 
+                            temp_game.serialize_board(), temp_game.serialize_castling_rights(), temp_game._serialize_ep()
+                        ),
+                        'eval': alt.get('eval')
+                    })
+            
+            best['predicted_responses'] = predicted_responses
+        except Exception:
+            logger.exception("Failed to predict opponent responses")
 
     if not best:
         if game.game_status == 'checkmate':
@@ -1427,17 +1519,6 @@ class CustomPasswordResetView(PasswordResetView):
         else:
             cache.set(ip_expires_key, time.time() + ip_timeout, timeout=ip_timeout)
 
-    def _single_user_form(self, selected_user):
-        base_form = self.get_form_class()
-
-        class SingleUserPasswordResetForm(base_form):
-            def get_users(self, email):
-                if selected_user and selected_user.has_usable_password():
-                    return [selected_user]
-                return []
-
-        return SingleUserPasswordResetForm
-
     def post(self, request, *args, **kwargs):
 
         email = request.POST.get('email', '').strip().lower()
@@ -1449,48 +1530,7 @@ class CustomPasswordResetView(PasswordResetView):
 
             return redirect('password_reset')
 
-        users = User.objects.filter(email__iexact=email)
-
-        if users.count() > 1 and not request.POST.get(
-            'selected_username'
-        ):
-
-            usernames = users.values_list(
-                'username',
-                flat=True
-            )
-
-            return render(
-                request,
-                'game/password_reset.html',
-                {
-                    'form': self.get_form(),
-                    'usernames': usernames,
-                    'email': email
-                }
-            )
-        selected_username = request.POST.get(
-            'selected_username'
-        )
-
-        form_class = self.get_form_class()
-        if selected_username:
-
-            selected_user = User.objects.filter(
-                username=selected_username,
-                email__iexact=email
-            ).first()
-
-            if not selected_user:
-                messages.error(
-                    request,
-                    'Please select a valid account for this email address.',
-                )
-                return redirect('password_reset')
-
-            form_class = self._single_user_form(selected_user)
-
-        form = form_class(**self.get_form_kwargs())
+        form = self.get_form()
         if not form.is_valid():
             return self.form_invalid(form)
 
@@ -1520,6 +1560,17 @@ def _is_trusted_proxy(ip_text, trusted_entries):
             continue
     return False
 
+
+def get_ai_move_rate_user_key(user_id):
+    """Get the cache key for per-user AI move rate limiting."""
+    digest = hashlib.sha256(str(user_id).encode('utf-8')).hexdigest()
+    return f'ai_move_rate:user:{digest}'
+
+
+def get_ai_move_rate_ip_key(ip):
+    """Get the cache key for per-IP AI move rate limiting."""
+    digest = hashlib.sha256(ip.encode('utf-8')).hexdigest()
+    return f'ai_move_rate:ip:{digest}'
 
 def get_client_ip(request):
     """Get client IP address safely by parsing trusted proxies."""
@@ -2233,22 +2284,6 @@ def cleanup_cron(request):
             'message': str(e)
         }, status=500)
 
-def password_reset_account_selection(request):
-
-    email = request.GET.get('email')
-
-    users = User.objects.filter(email=email)
-
-    return render(
-        request,
-        'game/password_reset_account_selection.html',
-        {
-            'users': users,
-            'email': email
-        }
-    )
-
-
 @login_required
 def delete_account(request):
 
@@ -2449,7 +2484,10 @@ def analyze_game_view(request):
         game = ChessGame()
         game.white_time = 10 ** 9
         game.black_time = 10 ** 9
-        
+
+        # Timeout handling for complex endgame analysis
+        ANALYSIS_TIMEOUT_SECONDS = getattr(settings, 'ANALYSIS_TIMEOUT_SECONDS', 10)
+
         analyzed_moves_count = 0
         for idx, notation in enumerate(moves[:80]): # Cap at 80 for perf
             move_num = idx // 2 + 1
@@ -2504,7 +2542,7 @@ def analyze_game_view(request):
                 is_best = (best_move['from_row'] == actual_from[0] and best_move['from_col'] == actual_from[1] and best_move['to_row'] == actual_to[0] and best_move['to_col'] == actual_to[1])
             else:
                 is_best = True
-                
+
             move_class = _classify_move(is_best, played_dict, best_move, game)
             if move_class == 'Blunder':
                 blunders += 1
@@ -2527,15 +2565,20 @@ def analyze_game_view(request):
         accuracy = round(((analyzed_moves_count - bad_moves) / analyzed_moves_count) * 100) if analyzed_moves_count > 0 else 100
         opening = detect_opening(moves) or 'Unknown'
 
-        return JsonResponse({
+        response_data = {
             'result': result,
             'end_reason': reason,
             'opening': opening,
             'captures': captures, 'checks': checks, 'checkmates': checkmates,
-            'promotions': promotions, 'blunders': blunders, 'mistakes': mistakes, 
+            'promotions': promotions, 'blunders': blunders, 'mistakes': mistakes,
             'accuracy': accuracy, 'total_moves': (len(moves) + 1) // 2, 'move_analysis_details': move_analysis_details,
             'move_analysis': [detail['class'] for detail in move_analysis_details],
-        })
+            'analysis_timeout_seconds': ANALYSIS_TIMEOUT_SECONDS
+        }
+
+        response = JsonResponse(response_data)
+        response['X-Analysis-Timeout'] = str(ANALYSIS_TIMEOUT_SECONDS)
+        return response
     except Exception as e:
         logger.error('Failed to analyze game: %s', e)
         return JsonResponse({'error': 'Failed to analyze game'}, status=400)
@@ -4099,25 +4142,27 @@ def apply_discussion_sort(queryset, sort_by):
     )
 
     if sort_by == "oldest":
-        return queryset.order_by("created_at")
+        return queryset.order_by("created_at", "-id")
 
     if sort_by == "most_replies":
-        return queryset.order_by("-reply_count", "-created_at")
+        return queryset.order_by("-reply_count", "-created_at", "-id")
 
     if sort_by == "most_bookmarked":
-        return queryset.order_by("-bookmark_count", "-created_at")
+        return queryset.order_by("-bookmark_count", "-created_at", "-id")
 
     if sort_by == "recently_active":
         return queryset.order_by(
             F("last_reply_at").desc(nulls_last=True),
             "-updated_at",
             "-created_at",
+            "-id"
         )
 
-    return queryset.order_by("-created_at")
+    return queryset.order_by("-created_at", "-id")
 
 def forum_list(request):
     sort_by = request.GET.get("sort", "newest")
+    page_number = request.GET.get("page", 1)
 
     discussions = Discussion.objects.select_related("user").prefetch_related("replies")
 
@@ -4126,6 +4171,9 @@ def forum_list(request):
     bookmarked_ids = set()
 
     discussions = apply_discussion_sort(discussions, sort_by)
+    
+    paginator = Paginator(discussions, 20)
+    page_obj = paginator.get_page(page_number)
 
     if request.user.is_authenticated:
         user_discussions = (
@@ -4161,6 +4209,7 @@ def forum_list(request):
         request,
         "game/forum_list.html",
         {
+            "page_obj": page_obj,
             "discussions": discussions,
             "user_discussions": user_discussions,
             "bookmarked_discussions": bookmarked_discussions,
@@ -4182,9 +4231,23 @@ def toggle_discussion_bookmark(request, discussion_id):
     if not created:
         bookmark.delete()
 
-    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER")
-    if next_url:
+    next_url = request.POST.get("next")
+    referer_url = request.META.get("HTTP_REFERER")
+    allowed_hosts = {request.get_host()}
+    require_https = request.is_secure()
+
+    if next_url and url_has_allowed_host_and_scheme(
+        url=next_url,
+        allowed_hosts=allowed_hosts,
+        require_https=require_https,
+    ):
         return redirect(next_url)
+    elif referer_url and url_has_allowed_host_and_scheme(
+        url=referer_url,
+        allowed_hosts=allowed_hosts,
+        require_https=require_https,
+    ):
+        return redirect(referer_url)
 
     return redirect("forum")
 
