@@ -515,12 +515,22 @@ class GameRecord(models.Model):
         return f"Game {self.id} ({self.white_label} vs {self.black_label})"
 
 def validate_game_state(value):
-    if not value:
+    if value is None:
         return
     if not isinstance(value, dict):
         raise ValidationError("game_state must be a dictionary")
-    if 'board' not in value or 'current_turn' not in value:
-        raise ValidationError("game_state must contain 'board' and 'current_turn'")
+        
+    required_keys = {'board', 'current_turn', 'white_time', 'black_time', 'last_ts'}
+    missing = required_keys - value.keys()
+    if missing:
+        raise ValidationError(f"game_state missing required keys: {', '.join(sorted(missing))}")
+        
+    if value['current_turn'] not in ('white', 'black'):
+        raise ValidationError("current_turn must be 'white' or 'black'")
+        
+    board = value['board']
+    if not isinstance(board, list) or len(board) != 8 or not all(isinstance(row, list) and len(row) == 8 for row in board):
+        raise ValidationError("board must be an 8x8 array")
 
 class ActiveGame(models.Model):
     """Tracks active games for efficient cleanup."""

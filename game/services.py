@@ -44,6 +44,14 @@ def load_game_state_helper(request):
                 ActiveGame.objects.filter(session_key=request.session.session_key).exclude(pk=active_game.pk).delete()
                 active_game.session_key = request.session.session_key
                 active_game.save(update_fields=['session_key'])
+            # Restore session metadata from the persisted game_state so that
+            # cross-device resumes receive the correct difficulty, opening, and
+            # player names even on a brand-new session with no prior context.
+            metadata = (active_game.game_state or {}).get('metadata') if active_game.game_state else None
+            if metadata and isinstance(metadata, dict):
+                for key in ('difficulty', 'opening', 'white_name', 'black_name'):
+                    if key in metadata and key not in request.session:
+                        request.session[key] = metadata[key]
             return active_game, active_game.game_state, active_game.version
         return None, None, 0
     else:
@@ -64,18 +72,22 @@ def save_game_state_helper(request, active_game, game_dict, current_version):
             request.session.save()
         
         if not active_game:
-            ActiveGame.objects.filter(user=request.user).delete()
-            ActiveGame.objects.filter(session_key=request.session.session_key).delete()
-            active_game = ActiveGame.objects.create(
-                user=request.user,
-                session_key=request.session.session_key,
-                game_state=game_dict,
-                version=1,
-                status="active"
-            )
-            if 'game' in request.session:
-                del request.session['game']
-            return True, active_game
+            with transaction.atomic():
+                # Lock the user row to serialize concurrent replacements
+                User.objects.select_for_update().filter(pk=request.user.pk).exists()
+
+                ActiveGame.objects.filter(user=request.user).delete()
+                ActiveGame.objects.filter(session_key=request.session.session_key).delete()
+                active_game = ActiveGame.objects.create(
+                    user=request.user,
+                    session_key=request.session.session_key,
+                    game_state=game_dict,
+                    version=1,
+                    status="active"
+                )
+                if 'game' in request.session:
+                    del request.session['game']
+                return True, active_game
 
         updated = ActiveGame.objects.filter(
             pk=active_game.pk,

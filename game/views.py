@@ -415,6 +415,15 @@ def new_game(request):
     game.paused = False
 
     game_dict = game.to_dict()
+    # Embed session metadata so it can be restored on a different device/session.
+    # Stored under a 'metadata' sub-key inside the existing game_state JSONField;
+    # no model change or migration is required.
+    game_dict['metadata'] = {
+        'difficulty': difficulty,
+        'opening': opening,
+        'white_name': request.session.get('white_name', 'White'),
+        'black_name': request.session.get('black_name', 'Black'),
+    }
     _success, active_game = save_game_state_helper(request, None, game_dict, 0)
     res_version = active_game.version if (active_game and request.user.is_authenticated) else 0
 
