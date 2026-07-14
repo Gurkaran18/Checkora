@@ -21,9 +21,11 @@ class SecurityHeadersMiddleware:
             "connect-src 'self'",
             "frame-src 'self'",
         ]
-        response["Content-Security-Policy"] = "; ".join(csp_policies)
+        if "Content-Security-Policy" not in response:
+            response["Content-Security-Policy"] = "; ".join(csp_policies)
         
         # Permissions-Policy to explicitly disable unused hardware features
-        response["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
+        if "Permissions-Policy" not in response:
+            response["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), interest-cohort=()"
         
         return response
