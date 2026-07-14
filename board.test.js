@@ -508,6 +508,7 @@ describe("Board UI Interactions", () => {
       global.fetch.mockClear();
       const event = new KeyboardEvent('keydown', { key: 'q' });
       document.dispatchEvent(event);
+      await new Promise(resolve => setTimeout(resolve, 0));
 
       expect(overlay.classList.contains("active")).toBe(false);
 
