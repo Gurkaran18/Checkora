@@ -1213,7 +1213,13 @@ DP cache is intentionally excluded to save cookie space."""
     # Max seconds for engine analysis before returning best move
     ANALYSIS_TIMEOUT_SECONDS = 10
 
-    def get_ai_move(self, depth=None):
+    DIFFICULTY_SETTINGS = {
+        'easy': {'max_depth': 2, 'time_budget_ms': 500},
+        'medium': {'max_depth': 4, 'time_budget_ms': 1500},
+        'hard': {'max_depth': 6, 'time_budget_ms': 4000},
+    }
+
+    def get_ai_move(self, depth=None, difficulty=None):
         """Return the best move for the current position.
 
         Checks the opening book first for an instant theory response.
@@ -1228,15 +1234,39 @@ DP cache is intentionally excluded to save cookie space."""
         if book_move:
             return book_move
 
-        # 2. Minimax search (slow path)
+        # 2. Map difficulty settings
+        if difficulty in self.DIFFICULTY_SETTINGS:
+            cfg = self.DIFFICULTY_SETTINGS[difficulty]
+            max_depth = cfg['max_depth']
+            time_budget_ms = cfg['time_budget_ms']
+        else:
+            # Map depth parameter if possible
+            if depth == 1:
+                cfg = self.DIFFICULTY_SETTINGS['easy']
+                max_depth = cfg['max_depth']
+                time_budget_ms = cfg['time_budget_ms']
+            elif depth == 2:
+                cfg = self.DIFFICULTY_SETTINGS['medium']
+                max_depth = cfg['max_depth']
+                time_budget_ms = cfg['time_budget_ms']
+            elif depth == 3:
+                cfg = self.DIFFICULTY_SETTINGS['hard']
+                max_depth = cfg['max_depth']
+                time_budget_ms = cfg['time_budget_ms']
+            else:
+                if depth is None:
+                    max_depth = self._get_ai_search_depth()
+                else:
+                    max_depth = depth
+                time_budget_ms = 2000  # Default budget
+
+        # 3. Minimax search (slow path)
         board_str = self.serialize_board()
         rights_str = self.serialize_castling_rights()
-        if depth is None:
-            depth = self._get_ai_search_depth()
         ep_str = self._serialize_ep()
         cmd = (
             f"BESTMOVE {board_str} {rights_str}"
-            f" {self.current_turn} {ep_str} {depth}"
+            f" {self.current_turn} {ep_str} {max_depth} {time_budget_ms}"
         )
         resp = self._call_engine(cmd)
 
@@ -1253,7 +1283,13 @@ DP cache is intentionally excluded to save cookie space."""
             'to_row':   int(parts[3]),
             'to_col':   int(parts[4]),
             'eval': None,
-            'alts': []
+            'alts': [],
+            'depth': 0,
+            'nodes': 0,
+            'tthits': 0,
+            'time': 0,
+            'engine': 'unknown',
+            'status': 'completed'
         }
         
         idx = 5
@@ -1263,7 +1299,7 @@ DP cache is intentionally excluded to save cookie space."""
                 idx += 2
             elif parts[idx] == "ALTS":
                 idx += 1
-                while idx + 4 < len(parts) and parts[idx] not in ("EVAL", "ALTS"):
+                while idx + 4 < len(parts) and parts[idx] not in ("EVAL", "ALTS", "DEPTH", "NODES", "TTHITS", "TIME", "ENGINE", "STATUS"):
                     move_data['alts'].append({
                         'from_row': int(parts[idx]),
                         'from_col': int(parts[idx+1]),
@@ -1272,6 +1308,24 @@ DP cache is intentionally excluded to save cookie space."""
                         'eval': int(parts[idx+4])
                     })
                     idx += 5
+            elif parts[idx] == "DEPTH" and idx + 1 < len(parts):
+                move_data['depth'] = int(parts[idx + 1])
+                idx += 2
+            elif parts[idx] == "NODES" and idx + 1 < len(parts):
+                move_data['nodes'] = int(parts[idx + 1])
+                idx += 2
+            elif parts[idx] == "TTHITS" and idx + 1 < len(parts):
+                move_data['tthits'] = int(parts[idx + 1])
+                idx += 2
+            elif parts[idx] == "TIME" and idx + 1 < len(parts):
+                move_data['time'] = int(parts[idx + 1])
+                idx += 2
+            elif parts[idx] == "ENGINE" and idx + 1 < len(parts):
+                move_data['engine'] = parts[idx + 1]
+                idx += 2
+            elif parts[idx] == "STATUS" and idx + 1 < len(parts):
+                move_data['status'] = parts[idx + 1]
+                idx += 2
             else:
                 idx += 1
 
