@@ -109,6 +109,205 @@
     }
 
     /* ==========================================================
+    FIRST-TIME VISITOR ONBOARDING TOUR
+    Shown once per browser (persisted via localStorage), then
+    never shown again unless local storage is cleared.
+    ========================================================== */
+    const TOUR_SEEN_KEY = 'checkoraTourSeen';
+
+    const TOUR_STEPS = [
+        {
+            selector: '#manualMoveInput',
+            text: "Type your move here, like \"e2e4\" — or drag a piece on the board."
+        },
+        {
+            selector: '#gameControlsCard',
+            text: "These are your game controls — flip the board, offer a draw, or resign anytime."
+        },
+        {
+            selector: '#boardThemeCard',
+            text: "Customize your board here — pick a color theme or turn on square coordinates."
+        },
+        {
+            selector: '#sessionScoreTracker',
+            text: "This tracks your wins, losses, and draws for this session. Good luck!"
+        }
+    ];
+
+    let tourStepIndex = 0;
+    let tourActiveTarget = null;
+
+    function hasTourAlreadyBeenSeen() {
+        try {
+            return localStorage.getItem(TOUR_SEEN_KEY) === 'true';
+        } catch (e) {
+            return true; // if localStorage is unavailable, don't force the tour
+        }
+    }
+
+    function markTourAsSeen() {
+        try {
+            localStorage.setItem(TOUR_SEEN_KEY, 'true');
+        } catch (e) {
+            // ignore (e.g. private browsing)
+        }
+    }
+
+    let tourHasBeenTriggeredThisPageLoad = false;
+
+    // Call this right after the welcome/setup screen closes, from any
+    // game-start path. Safe to call multiple times — only runs once.
+    function maybeStartTourAfterWelcomeCloses() {
+        if (tourHasBeenTriggeredThisPageLoad) return;
+        if (hasTourAlreadyBeenSeen()) return;
+        tourHasBeenTriggeredThisPageLoad = true;
+        setTimeout(startTour, 400);
+    }
+
+    function positionTourTooltip(targetEl) {
+        const tooltip = document.getElementById('tourTooltip');
+        const rect = targetEl.getBoundingClientRect();
+        const tooltipHeight = tooltip.offsetHeight || 120;
+        const spacing = 12;
+
+        let top = rect.bottom + spacing;
+        // If tooltip would overflow the bottom of the screen, place it above instead
+        if (top + tooltipHeight > window.innerHeight) {
+            top = rect.top - tooltipHeight - spacing;
+        }
+        if (top < 8) top = 8;
+
+        let left = rect.left;
+        const tooltipWidth = tooltip.offsetWidth || 280;
+        if (left + tooltipWidth > window.innerWidth) {
+            left = window.innerWidth - tooltipWidth - 16;
+        }
+        if (left < 8) left = 8;
+
+        tooltip.style.top = `${top}px`;
+        tooltip.style.left = `${left}px`;
+    }
+
+    function isElementActuallyVisible(el) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return false;
+        return (
+            rect.right > 0 &&
+            rect.left < window.innerWidth &&
+            rect.bottom > 0 &&
+            rect.top < window.innerHeight
+        );
+    }
+
+    function showTourStep(index) {
+        if (tourActiveTarget) {
+            tourActiveTarget.classList.remove('tour-spotlight');
+            tourActiveTarget = null;
+        }
+
+        if (index >= TOUR_STEPS.length) {
+            endTour();
+            return;
+        }
+
+        const step = TOUR_STEPS[index];
+        const targetEl = document.querySelector(step.selector);
+
+        // Skip a step gracefully if that element isn't on the page right now,
+        // or if it's currently offscreen (e.g. inside a closed mobile drawer)
+        if (!targetEl || !isElementActuallyVisible(targetEl)) {
+            showTourStep(index + 1);
+            return;
+        }
+
+        targetEl.classList.add('tour-spotlight');
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        tourActiveTarget = targetEl;
+
+        document.getElementById('tourStepLabel').textContent =
+            `Step ${index + 1} of ${TOUR_STEPS.length}`;
+        document.getElementById('tourStepText').textContent = step.text;
+        document.getElementById('tourNextBtn').textContent =
+            (index === TOUR_STEPS.length - 1) ? 'Finish' : 'Next →';
+
+        // Give the browser a moment to scroll before positioning the tooltip
+        setTimeout(() => positionTourTooltip(targetEl), 300);
+    }
+
+    let tourClickListenerAttached = false;
+
+    function attachTourClickListener() {
+        if (tourClickListenerAttached) return;
+        const overlay = document.getElementById('tourOverlay');
+        if (!overlay) return;
+        tourClickListenerAttached = true;
+
+        // Event delegation: listen on the overlay itself (which never gets
+        // replaced), rather than binding directly to the buttons.
+        overlay.addEventListener('click', (e) => {
+            const target = e.target.closest('#tourSkipBtn, #tourNextBtn');
+            if (!target) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (target.id === 'tourSkipBtn') {
+                endTour();
+            } else if (target.id === 'tourNextBtn') {
+                tourStepIndex += 1;
+                showTourStep(tourStepIndex);
+            }
+        });
+
+        // Keep Tab from leaving the tour dialog while it's open
+        overlay.addEventListener('keydown', (e) => {
+            if (e.key !== 'Tab') return;
+            const focusable = overlay.querySelectorAll('#tourSkipBtn, #tourNextBtn');
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        });
+    }
+
+    function startTour() {
+        const overlay = document.getElementById('tourOverlay');
+        if (!overlay) return;
+        attachTourClickListener();
+        overlay.style.display = 'block';
+        tourStepIndex = 0;
+        showTourStep(tourStepIndex);
+        const tooltip = document.getElementById('tourTooltip');
+        if (tooltip) tooltip.focus();
+    }
+
+    function endTour() {
+        if (tourActiveTarget) {
+            tourActiveTarget.classList.remove('tour-spotlight');
+            tourActiveTarget = null;
+        }
+        const overlay = document.getElementById('tourOverlay');
+        if (overlay) overlay.style.display = 'none';
+        markTourAsSeen();
+    }
+
+    function initOnboardingTour() {
+        attachTourClickListener();
+
+        const welcomeOverlay = document.getElementById('welcomeOverlay');
+
+        // If there's no setup screen blocking the view at all (e.g. resuming
+        // an existing game), it's safe to start the tour right away.
+        if (!welcomeOverlay || !welcomeOverlay.classList.contains('active')) {
+            maybeStartTourAfterWelcomeCloses();
+        }
+    }
+
+    /* ==========================================================
     GAME COUNTER (Game #N badge — persists via sessionStorage,
     resets automatically when the browser session ends)
     ========================================================== */
@@ -1339,6 +1538,7 @@
                         false
                     );
                     welcomeOverlay.classList.remove('active');
+                    maybeStartTourAfterWelcomeCloses();
                     gameLayout.style.visibility = 'visible';
                     return;
                 }
@@ -4307,6 +4507,7 @@ function updateStepperUI() {
             const started = await startNewGame(mode, pColor, diff, fenValue);
             if (!started) return;
             welcomeOverlay.classList.remove('active');
+                    maybeStartTourAfterWelcomeCloses();
             gameLayout.style.visibility = 'visible';
         });
     }
@@ -4317,6 +4518,7 @@ function updateStepperUI() {
         const started = await startNewGame('pvp', 'white', 'medium', fen);
         if (!started) return;
         welcomeOverlay.classList.remove('active');
+                    maybeStartTourAfterWelcomeCloses();
         gameLayout.style.visibility = 'visible';
     };
 
@@ -4326,6 +4528,7 @@ function updateStepperUI() {
             await startDailyPuzzle();
 
             welcomeOverlay.classList.remove('active');
+                    maybeStartTourAfterWelcomeCloses();
             gameLayout.style.visibility = 'visible';
         };
     }
@@ -4422,6 +4625,7 @@ function updateStepperUI() {
         const started = await startNewGame('ai', selectedPveColor, diff, fen);
         if (!started) return;
         welcomeOverlay.classList.remove('active');
+                    maybeStartTourAfterWelcomeCloses();
         gameLayout.style.visibility = 'visible';
     };
 
@@ -4484,6 +4688,7 @@ function updateStepperUI() {
             return;
         }
         welcomeOverlay.classList.remove('active');
+                    maybeStartTourAfterWelcomeCloses();
         gameLayout.style.visibility = 'visible';
         paused = false;
         updatePauseUI();
@@ -4614,6 +4819,7 @@ function updateStepperUI() {
 
         fenOverlay.classList.remove('active');
         welcomeOverlay.classList.remove('active');
+                    maybeStartTourAfterWelcomeCloses();
         gameLayout.style.visibility = 'visible';
     };
 
@@ -5812,6 +6018,9 @@ async function handleSanMove() {
     updateSessionTracker();
     // Render the current game count already stored for this browser session
     updateGameCounterDisplay();
+    // Wire up the onboarding tour's Skip/Next buttons and, if resuming a
+    // game with no setup screen showing, start it right away
+    initOnboardingTour();
     // Resume game by clicking the paused board overlay
     boardEl.addEventListener('click', async () => {
         if (!paused) return;
