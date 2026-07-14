@@ -68,8 +68,6 @@ class ActiveGameConcurrencyTest(TransactionTestCase):
         Creates a deterministic race window to verify that select_for_update
         prevents IntegrityError when two /new-game requests arrive simultaneously.
         """
-        import concurrent.futures
-        import time
         from unittest.mock import patch
         from django.db import connection as db_conn
 
