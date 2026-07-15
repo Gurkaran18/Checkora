@@ -19,6 +19,10 @@
     {% include 'game/includes/navbar.html' %}
 
     <main class="auth-layout">
+        <a href="{% url 'landing' %}" class="auth-home-link" aria-label="Back to home">
+            <span aria-hidden="true" class="auth-home-link__arrow">&larr;</span>
+            <span>Back to Home</span>
+        </a>
 
         <div class="header header--with-navbar">
             <p class="login-subtitle">Welcome back! Sign in to continue</p>
