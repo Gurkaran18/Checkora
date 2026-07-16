@@ -17,6 +17,79 @@
     --accent-gold: #d4a017;
 }
 
+/* ============================================================
+   Navbar Elements (UI Refinements & Alignment Fixes)
+   ============================================================ */
+
+/* Main wrapper to enforce sleek padding and vertical center alignment */
+.navbar-wrapper {
+    width: 100%;
+    padding: 12px 24px; /* Reduced vertical padding for a sleeker profile */
+    display: flex;
+    align-items: center; /* Ensures ALL left, center, and right elements align perfectly */
+    justify-content: space-between;
+    background-color: var(--card-bg);
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* Group container alignment blocks */
+.navbar-brand,
+.navbar-links,
+.navbar-actions {
+    display: flex;
+    align-items: center; /* Enforces absolute midline layout symmetry */
+    gap: 1.5rem;
+}
+
+/* Fixing the "Cursor: Default" Dropdown spacing profile */
+.navbar-dropdown-btn {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px; /* Compressed padding gives inner text breathing room from container margins */
+    font-size: 0.92rem;
+    height: auto;
+}
+
+/* High Contrast Adjustments for Sign In button styling */
+.navbar-btn-outline {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.4); /* Boosted border opacity */
+    color: #ffffff; /* Brightened text from dark gray to pure white for readability */
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.navbar-btn-outline:hover {
+    border-color: var(--accent-gold);
+    color: var(--accent-gold);
+}
+
+/* Solid Register Action button alignment syncing */
+.navbar-btn-solid {
+    background: var(--accent-gold);
+    color: #0b1020;
+    padding: 8px 16px;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.navbar-btn-solid:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(240, 192, 64, 0.2);
+}
+
+/* ============================================================
+   Layout & Utility Styles
+   ============================================================ */
 .header,
 .auth-card {
     width: 100%;
@@ -167,6 +240,9 @@ body {
     }
 }
 
+/* ============================================================
+   Auth Card & Form Fields
+   ============================================================ */
 .auth-card {
     background: var(--card-bg);
     border: 1px solid var(--border-color);
@@ -256,6 +332,9 @@ body {
     border-left-color: #4caf50;
 }
 
+/* ============================================================
+   Buttons
+   ============================================================ */
 .btn {
     width: 100%;
     padding: 14px 0;
@@ -315,22 +394,6 @@ body {
 }
 .auth-footer a:hover { text-decoration: underline; }
 
-@media (max-width: 600px) {
-    body {
-        padding: 20px;
-    }
-    .auth-home-link {
-        padding: 0.72rem 0.9rem;
-        font-size: 0.9rem;
-    }
-    .auth-card {
-        padding: 24px 20px;
-        max-width: 100%;
-    }
-    .header h1 {
-        font-size: 1.8rem;
-    }
-}
 .back-home {
     position: fixed;
     top: 20px;
@@ -389,6 +452,9 @@ body.login-page .helptext {
     display: none;
 }
 
+/* ============================================================
+   Checklist & Validation Indicators
+   ============================================================ */
 .password-checklist {
     list-style: none;
     padding: 0;
@@ -453,6 +519,9 @@ body.login-page .helptext {
     to { opacity: 0; height: 0; padding: 0; margin: 0; }
 }
 
+/* ============================================================
+   Toasts & Alerts
+   ============================================================ */
 .toast-container {
     position: fixed;
     top: 20px;
@@ -489,49 +558,6 @@ body.login-page .helptext {
 @keyframes toast-exit-anim {
     from { transform: translateX(0); opacity: 1; }
     to { transform: translateX(100%); opacity: 0; }
-}
-
-@media (max-width: 600px) {
-    .auth-card {
-        padding: 30px 20px;
-    }
-}
-
-@media (max-width: 768px) {
-    body {
-        padding: 20px 16px;
-        justify-content: center;
-    }
-    .auth-home-link {
-        margin-bottom: 4px;
-    }
-    .auth-card {
-        width: 100%;
-        padding: 24px 18px;
-    }
-    .header {
-        width: 100%;
-        max-width: 100%;
-    }
-}
-
-@media (min-width: 1400px) {
-    .auth-card {
-        max-width: 680px;
-    }
-}
-
-body.new-cyber-design .auth-home-link {
-    background: rgba(13, 17, 33, 0.9);
-    border-color: rgba(240, 192, 64, 0.14);
-    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.38);
-}
-
-body.new-cyber-design .auth-home-link:hover {
-    border-color: rgba(240, 192, 64, 0.55);
-    background: rgba(240, 192, 64, 0.1);
-    color: #ffffff;
-    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.45), 0 0 18px rgba(240, 192, 64, 0.1);
 }
 
 .back-btn {
@@ -580,13 +606,52 @@ body.new-cyber-design .auth-home-link:hover {
 }
 
 /* ============================================================
+   Media Queries & Responsiveness
+   ============================================================ */
+@media (max-width: 600px) {
+    body {
+        padding: 20px;
+    }
+    .auth-home-link {
+        padding: 0.72rem 0.9rem;
+        font-size: 0.9rem;
+    }
+    .auth-card {
+        padding: 30px 20px;
+        max-width: 100%;
+    }
+    .header h1 {
+        font-size: 1.8rem;
+    }
+}
+
+@media (max-width: 768px) {
+    body {
+        padding: 20px 16px;
+        justify-content: center;
+    }
+    .auth-home-link {
+        margin-bottom: 4px;
+    }
+    .auth-card {
+        width: 100%;
+        padding: 24px 18px;
+    }
+    .header {
+        width: 100%;
+        max-width: 100%;
+    }
+}
+
+@media (min-width: 1400px) {
+    .auth-card {
+        max-width: 680px;
+    }
+}
+
+/* ============================================================
    CYBERPUNK NEON GLOW DESIGN OVERRIDES (.new-cyber-design)
    ============================================================ */
-
-[data-theme="light"] body.new-cyber-design {
-    background: var(--bg-primary);
-}
-/* Light theme overrides for login page */
 [data-theme="light"] body.new-cyber-design {
     background: var(--bg-primary);
 }
@@ -615,6 +680,19 @@ body.new-cyber-design .auth-home-link:hover {
 [data-theme="light"] body.new-cyber-design .auth-card input[type="password"]:focus {
     background: var(--input-bg) !important;
     border-color: var(--accent-gold) !important;
+}
+
+body.new-cyber-design .auth-home-link {
+    background: rgba(13, 17, 33, 0.9);
+    border-color: rgba(240, 192, 64, 0.14);
+    box-shadow: 0 14px 30px rgba(0, 0, 0, 0.38);
+}
+
+body.new-cyber-design .auth-home-link:hover {
+    border-color: rgba(240, 192, 64, 0.55);
+    background: rgba(240, 192, 64, 0.1);
+    color: #ffffff;
+    box-shadow: 0 18px 36px rgba(0, 0, 0, 0.45), 0 0 18px rgba(240, 192, 64, 0.1);
 }
 
 /* Subtle digital grid overlay in background */
@@ -667,7 +745,7 @@ body.new-cyber-design .modern-group label {
     margin-bottom: 8px;
 }
 
-/* Strict input field prioritization structure (UPDATED FOR BETTER VISIBILITY) */
+/* Strict input field prioritization structure */
 body.new-cyber-design .modern-group input,
 body.new-cyber-design .auth-card input[type="text"],
 body.new-cyber-design .auth-card input[type="password"] {
@@ -682,14 +760,12 @@ body.new-cyber-design .auth-card input[type="password"] {
     transition: all 0.25s ease-in-out !important;
 }
 
-/* Hover state to make it feel reactive before clicking */
 body.new-cyber-design .modern-group input:hover,
 body.new-cyber-design .auth-card input[type="text"]:hover,
 body.new-cyber-design .auth-card input[type="password"]:hover {
     border-color: rgba(240, 192, 64, 0.4) !important;
 }
 
-/* Synchronized dynamic glow animation for focused items */
 body.new-cyber-design .modern-group input:focus,
 body.new-cyber-design .auth-card input[type="text"]:focus,
 body.new-cyber-design .auth-card input[type="password"]:focus {
@@ -707,7 +783,7 @@ body.new-cyber-design .custom-checkbox-container {
     cursor: pointer;
     user-select: none;
     padding-left: 28px;
-    color: #8c94a5;
+    color: #cbd5e1; /* Boosted contrast */
     font-size: 0.92rem;
     transition: color 0.2s ease;
 }
@@ -829,17 +905,4 @@ body.new-cyber-design .forgot-link {
 body.new-cyber-design .forgot-link:hover {
     color: #f0c040 !important;
     text-shadow: 0 0 8px rgba(240, 192, 64, 0.5);
-}
-
-/* Custom premium checkbox container layout (COLOR BOOSTED) */
-body.new-cyber-design .custom-checkbox-container {
-    display: inline-flex;
-    align-items: center;
-    position: relative;
-    cursor: pointer;
-    user-select: none;
-    padding-left: 28px;
-    color: #cbd5e1; /* Changed from #8c94a5 to #cbd5e1 for clean contrast */
-    font-size: 0.92rem;
-    transition: color 0.2s ease;
 }
