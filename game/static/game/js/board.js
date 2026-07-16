@@ -2086,6 +2086,8 @@
             
             const img = document.createElement('img');
             img.src = PIECE_IMG[prefix + key];
+            img.alt = '';
+            img.setAttribute('aria-hidden', 'true');
             btn.appendChild(img);
             
             const labelSpan = document.createElement('span');
