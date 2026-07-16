@@ -76,6 +76,7 @@ document.body.innerHTML = `
   <div id="resBlunder"></div>
 `;
 
+const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0));
 
 global.fetch = jest.fn((url, options) => {
   let boardData = [
@@ -490,39 +491,39 @@ describe("Board UI Interactions", () => {
 
       // Select pawn on e7 (row 1, col 4)
       e7Square.click();
-      await new Promise(resolve => setTimeout(resolve, 0));
-
+      await flushPromises();
+ 
       // Move to e8 (row 0, col 4) (promotes)
       e8Square.click();
-      await new Promise(resolve => setTimeout(resolve, 0));
-
+      await flushPromises();
+ 
       const overlay = document.getElementById("promoOverlay");
       expect(overlay.classList.contains("active")).toBe(true);
-
+ 
       const promoChoices = document.getElementById("promoChoices");
       const buttons = promoChoices.querySelectorAll(".promo-btn");
       expect(buttons.length).toBe(4);
       expect(buttons[0].querySelector(".promo-key").textContent).toBe("(q)");
       expect(buttons[0].querySelector(".promo-text").textContent).toContain("Queen");
-
+ 
       global.fetch.mockClear();
-
+ 
       // Dispatch an invalid key 'x' and assert overlay stays active and no fetch call is made
       const invalidEvent = new KeyboardEvent('keydown', { key: 'x' });
       document.dispatchEvent(invalidEvent);
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await flushPromises();
       expect(overlay.classList.contains("active")).toBe(true);
       expect(global.fetch.mock.calls.length).toBe(0);
-
+ 
       // Focus an input element to verify keydown intercepts even when inputs are focused
       const inputEl = document.getElementById("sanMoveInput");
       inputEl.focus();
       expect(document.activeElement).toBe(inputEl);
-
+ 
       // Dispatch an uppercase 'Q' and assert overlay closes and correct move is submitted
       const event = new KeyboardEvent('keydown', { key: 'Q' });
       document.dispatchEvent(event);
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await flushPromises();
 
       expect(overlay.classList.contains("active")).toBe(false);
 
@@ -602,9 +603,6 @@ describe("SAN Quick Move Input", () => {
     await startNewGame('pvp', 'white', 'medium', 'startpos', 10);
   });
 
-  async function flushPromises() {
-    return new Promise(resolve => setTimeout(resolve, 0));
-  }
 
   it('valid pawn move (e4) using Enter key clears input and calls /api/move/', async () => {
     const input = document.getElementById("sanMoveInput");

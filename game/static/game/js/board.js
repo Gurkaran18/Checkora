@@ -5290,7 +5290,7 @@ async function handleSanMove() {
             return;
         }
 
-        const tag = document.activeElement && document.activeElement.tagName;
+        const tag = document.activeElement?.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
         if (replayMode) {
