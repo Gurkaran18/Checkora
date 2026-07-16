@@ -33,15 +33,30 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 });
 
-// ── Chess Quote (Hero → Platform Capabilities) ──
+// ── Random Chess Quote (Hero → Platform Capabilities) ──
 document.addEventListener("DOMContentLoaded", () => {
     const quoteTextEl = document.getElementById("chessQuoteText");
     const quoteAuthorEl = document.getElementById("chessQuoteAuthor");
 
     if (!quoteTextEl || !quoteAuthorEl) return;
 
-    const CHESS_QUOTE = { text: "Every chess master was once a beginner.", author: "Irving Chernev" };
+    const quotes = [
+        { text: "Every chess master was once a beginner.", author: "Irving Chernev" },
+        { text: "Chess is the gymnasium of the mind.", author: "Blaise Pascal" },
+        { text: "Chess is life in miniature.", author: "Garry Kasparov" },
+        { text: "When you see a good move, look for a better one.", author: "Emanuel Lasker" },
+        { text: "Tactics flow from a superior position.", author: "Bobby Fischer" },
+        { text: "The blunders are all there on the board, waiting to be made.", author: "Savielly Tartakower" },
+        { text: "A good player is always lucky.", author: "Jose Raul Capablanca" },
+        { text: "In life, as in chess, forethought wins.", author: "Charles Buxton" },
+        { text: "Chess is beautiful enough to waste your life for.", author: "Hans Ree" },
+        { text: "You may learn much more from a game you lose than from a game you win.", author: "Jose Raul Capablanca" },
+        { text: "Chess, like love, like music, has the power to make people happy.", author: "Siegbert Tarrasch" },
+        { text: "Even a poor plan is better than no plan at all.", author: "Mikhail Chigorin" }
+    ];
 
-    quoteTextEl.textContent = CHESS_QUOTE.text;
-    quoteAuthorEl.textContent = CHESS_QUOTE.author;
+    const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+
+    quoteTextEl.textContent = randomQuote.text;
+    quoteAuthorEl.textContent = randomQuote.author;
 });
