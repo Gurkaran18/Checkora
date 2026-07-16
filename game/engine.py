@@ -590,7 +590,7 @@ DP cache is intentionally excluded to save cookie space."""
                     try:
                         proc.kill()
                         proc.communicate()
-                   except OSError:
+                    except Exception:
                         pass
                 return None
             except OSError:
