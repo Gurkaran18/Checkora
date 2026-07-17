@@ -1721,7 +1721,7 @@ class StaleGameCleanupTest(TestCase):
         )
 
         ActiveGame.objects.filter(pk=active_game.pk).update(
-            last_active=timezone.now() - timezone.timedelta(hours=50)
+            last_activity_at=timezone.now() - timezone.timedelta(hours=50)
         )
 
         response = self.client.post(self.url, HTTP_AUTHORIZATION=f'Bearer {self.secret}')
@@ -1756,7 +1756,7 @@ class StaleGameCleanupTest(TestCase):
         )
 
         ActiveGame.objects.filter(pk=active_game.pk).update(
-            last_active=timezone.now() - timezone.timedelta(hours=50)
+            last_activity_at=timezone.now() - timezone.timedelta(hours=50)
         )
 
         response = self.client.post(self.url, HTTP_AUTHORIZATION=f'Bearer {self.secret}')
@@ -2460,7 +2460,7 @@ class GameResultMoveHistoryTest(TestCase):
         )
 
         ActiveGame.objects.filter(pk=active_game.pk).update(
-            last_active=timezone.now() - timezone.timedelta(hours=50)
+            last_activity_at=timezone.now() - timezone.timedelta(hours=50)
         )
 
         deleted, resigned = cleanup_stale_games()

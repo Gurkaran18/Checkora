@@ -109,6 +109,205 @@
     }
 
     /* ==========================================================
+    FIRST-TIME VISITOR ONBOARDING TOUR
+    Shown once per browser (persisted via localStorage), then
+    never shown again unless local storage is cleared.
+    ========================================================== */
+    const TOUR_SEEN_KEY = 'checkoraTourSeen';
+
+    const TOUR_STEPS = [
+        {
+            selector: '#manualMoveInput',
+            text: "Type your move here, like \"e2e4\" — or drag a piece on the board."
+        },
+        {
+            selector: '#gameControlsCard',
+            text: "These are your game controls — flip the board, offer a draw, or resign anytime."
+        },
+        {
+            selector: '#boardThemeCard',
+            text: "Customize your board here — pick a color theme or turn on square coordinates."
+        },
+        {
+            selector: '#sessionScoreTracker',
+            text: "This tracks your wins, losses, and draws for this session. Good luck!"
+        }
+    ];
+
+    let tourStepIndex = 0;
+    let tourActiveTarget = null;
+
+    function hasTourAlreadyBeenSeen() {
+        try {
+            return localStorage.getItem(TOUR_SEEN_KEY) === 'true';
+        } catch (e) {
+            return true; // if localStorage is unavailable, don't force the tour
+        }
+    }
+
+    function markTourAsSeen() {
+        try {
+            localStorage.setItem(TOUR_SEEN_KEY, 'true');
+        } catch (e) {
+            // ignore (e.g. private browsing)
+        }
+    }
+
+    let tourHasBeenTriggeredThisPageLoad = false;
+
+    // Call this right after the welcome/setup screen closes, from any
+    // game-start path. Safe to call multiple times — only runs once.
+    function maybeStartTourAfterWelcomeCloses() {
+        if (tourHasBeenTriggeredThisPageLoad) return;
+        if (hasTourAlreadyBeenSeen()) return;
+        tourHasBeenTriggeredThisPageLoad = true;
+        setTimeout(startTour, 400);
+    }
+
+    function positionTourTooltip(targetEl) {
+        const tooltip = document.getElementById('tourTooltip');
+        const rect = targetEl.getBoundingClientRect();
+        const tooltipHeight = tooltip.offsetHeight || 120;
+        const spacing = 12;
+
+        let top = rect.bottom + spacing;
+        // If tooltip would overflow the bottom of the screen, place it above instead
+        if (top + tooltipHeight > window.innerHeight) {
+            top = rect.top - tooltipHeight - spacing;
+        }
+        if (top < 8) top = 8;
+
+        let left = rect.left;
+        const tooltipWidth = tooltip.offsetWidth || 280;
+        if (left + tooltipWidth > window.innerWidth) {
+            left = window.innerWidth - tooltipWidth - 16;
+        }
+        if (left < 8) left = 8;
+
+        tooltip.style.top = `${top}px`;
+        tooltip.style.left = `${left}px`;
+    }
+
+    function isElementActuallyVisible(el) {
+        const rect = el.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) return false;
+        return (
+            rect.right > 0 &&
+            rect.left < window.innerWidth &&
+            rect.bottom > 0 &&
+            rect.top < window.innerHeight
+        );
+    }
+
+    function showTourStep(index) {
+        if (tourActiveTarget) {
+            tourActiveTarget.classList.remove('tour-spotlight');
+            tourActiveTarget = null;
+        }
+
+        if (index >= TOUR_STEPS.length) {
+            endTour();
+            return;
+        }
+
+        const step = TOUR_STEPS[index];
+        const targetEl = document.querySelector(step.selector);
+
+        // Skip a step gracefully if that element isn't on the page right now,
+        // or if it's currently offscreen (e.g. inside a closed mobile drawer)
+        if (!targetEl || !isElementActuallyVisible(targetEl)) {
+            showTourStep(index + 1);
+            return;
+        }
+
+        targetEl.classList.add('tour-spotlight');
+        targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        tourActiveTarget = targetEl;
+
+        document.getElementById('tourStepLabel').textContent =
+            `Step ${index + 1} of ${TOUR_STEPS.length}`;
+        document.getElementById('tourStepText').textContent = step.text;
+        document.getElementById('tourNextBtn').textContent =
+            (index === TOUR_STEPS.length - 1) ? 'Finish' : 'Next →';
+
+        // Give the browser a moment to scroll before positioning the tooltip
+        setTimeout(() => positionTourTooltip(targetEl), 300);
+    }
+
+    let tourClickListenerAttached = false;
+
+    function attachTourClickListener() {
+        if (tourClickListenerAttached) return;
+        const overlay = document.getElementById('tourOverlay');
+        if (!overlay) return;
+        tourClickListenerAttached = true;
+
+        // Event delegation: listen on the overlay itself (which never gets
+        // replaced), rather than binding directly to the buttons.
+        overlay.addEventListener('click', (e) => {
+            const target = e.target.closest('#tourSkipBtn, #tourNextBtn');
+            if (!target) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            if (target.id === 'tourSkipBtn') {
+                endTour();
+            } else if (target.id === 'tourNextBtn') {
+                tourStepIndex += 1;
+                showTourStep(tourStepIndex);
+            }
+        });
+
+        // Keep Tab from leaving the tour dialog while it's open
+        overlay.addEventListener('keydown', (e) => {
+            if (e.key !== 'Tab') return;
+            const focusable = overlay.querySelectorAll('#tourSkipBtn, #tourNextBtn');
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        });
+    }
+
+    function startTour() {
+        const overlay = document.getElementById('tourOverlay');
+        if (!overlay) return;
+        attachTourClickListener();
+        overlay.style.display = 'block';
+        tourStepIndex = 0;
+        showTourStep(tourStepIndex);
+        const tooltip = document.getElementById('tourTooltip');
+        if (tooltip) tooltip.focus();
+    }
+
+    function endTour() {
+        if (tourActiveTarget) {
+            tourActiveTarget.classList.remove('tour-spotlight');
+            tourActiveTarget = null;
+        }
+        const overlay = document.getElementById('tourOverlay');
+        if (overlay) overlay.style.display = 'none';
+        markTourAsSeen();
+    }
+
+    function initOnboardingTour() {
+        attachTourClickListener();
+
+        const welcomeOverlay = document.getElementById('welcomeOverlay');
+
+        // If there's no setup screen blocking the view at all (e.g. resuming
+        // an existing game), it's safe to start the tour right away.
+        if (!welcomeOverlay || !welcomeOverlay.classList.contains('active')) {
+            maybeStartTourAfterWelcomeCloses();
+        }
+    }
+
+    /* ==========================================================
     GAME COUNTER (Game #N badge — persists via sessionStorage,
     resets automatically when the browser session ends)
     ========================================================== */
@@ -190,6 +389,8 @@
     let currentPuzzleFen = null;
     let puzzleAnalyzing = false;
     let stockfishWorker = null;
+    let stockfishEvalSeq = 0;
+    let stockfishActiveReject = null;
 
     let hintLevel = 0;
 
@@ -377,9 +578,30 @@
         if (evaluationCache[fen]) {
             return Promise.resolve(evaluationCache[fen]);
         }
-        return new Promise((resolve) => {
+
+        // Cancel previous request if one is active to avoid leaks and settle the promise
+        if (stockfishActiveReject) {
+            try {
+                stockfishActiveReject(new Error("Evaluation superseded"));
+            } catch (e) {
+                console.error("Error settling superseded evaluation:", e);
+            }
+            stockfishActiveReject = null;
+        }
+
+        // Stop the current computation of the worker immediately
+        if (stockfishWorker) {
+            stockfishWorker.postMessage('stop');
+        }
+
+        stockfishEvalSeq++;
+        const currentEvalId = stockfishEvalSeq;
+
+        return new Promise((resolve, reject) => {
+            stockfishActiveReject = reject;
             initStockfish();
 
+            const activeWorker = stockfishWorker;
             let scoreType = 'cp';
             let scoreValue = 0;
 
@@ -392,17 +614,28 @@
                 }
 
                 if (line.startsWith('bestmove')) {
-                    stockfishWorker.removeEventListener('message', onMessage);
-                    const result = { type: scoreType, value: scoreValue };
-                    evaluationCache[fen] = result;
-                    resolve(result);
+                    if (activeWorker) {
+                        activeWorker.removeEventListener('message', onMessage);
+                    }
+                    if (currentEvalId === stockfishEvalSeq) {
+                        stockfishActiveReject = null;
+                        const result = { type: scoreType, value: scoreValue };
+                        evaluationCache[fen] = result;
+                        resolve(result);
+                    } else {
+                        reject(new Error("Evaluation superseded"));
+                    }
                 }
             };
 
-            stockfishWorker.addEventListener('message', onMessage);
-            stockfishWorker.postMessage('ucinewgame');
-            stockfishWorker.postMessage(`position fen ${fen}`);
-            stockfishWorker.postMessage('go depth 6 movetime 100');
+            if (activeWorker) {
+                activeWorker.addEventListener('message', onMessage);
+                activeWorker.postMessage('ucinewgame');
+                activeWorker.postMessage(`position fen ${fen}`);
+                activeWorker.postMessage('go depth 6 movetime 100');
+            } else {
+                reject(new Error("Worker not initialized"));
+            }
         });
     }
 
@@ -417,6 +650,89 @@
             }
         } else {
             return -value || 0;
+        }
+    }
+
+    function updateEvalBarVisibility() {
+        if (!evalBarContainer) return;
+        const isPuzzle = dailyPuzzleMode;
+        const show = (gameMode === 'ai' || gameMode === 'analysis' || replayMode) && !isPuzzle;
+        if (show) {
+            document.documentElement.classList.add('has-eval-bar');
+            if (flipped) {
+                evalBarContainer.classList.add('flipped');
+            } else {
+                evalBarContainer.classList.remove('flipped');
+            }
+        } else {
+            document.documentElement.classList.remove('has-eval-bar');
+        }
+    }
+
+    function updateEvalBar(evalResult, fen) {
+        if (!evalBarWhite || !evalBarScore) return;
+        let percentage = 50;
+        let displayLabel = '0.0';
+        if (evalResult) {
+            const type = evalResult.type;
+            const value = evalResult.value;
+            const sideToMove = fen ? fen.split(' ')[1] : 'w';
+            if (type === 'mate') {
+                let isWhiteMate = false;
+                if (sideToMove === 'w') {
+                    isWhiteMate = value > 0;
+                } else {
+                    isWhiteMate = value < 0;
+                }
+                displayLabel = `M${Math.abs(value)}`;
+                percentage = isWhiteMate ? 100 : 0;
+            } else {
+                let cp = value;
+                if (sideToMove === 'b') {
+                    cp = -cp;
+                }
+                const rawScore = cp / 100;
+                displayLabel = (rawScore >= 0 ? '+' : '') + rawScore.toFixed(1);
+                const val = 2 / (1 + Math.exp(-0.4 * rawScore)) - 1;
+                percentage = 50 + 50 * val;
+            }
+        }
+        evalBarWhite.style.height = `${percentage}%`;
+        evalBarScore.textContent = displayLabel;
+        const isWhiteAdvantage = percentage >= 50;
+        evalBarScore.style.top = '';
+        evalBarScore.style.bottom = '';
+        if (!flipped) {
+            if (isWhiteAdvantage) {
+                evalBarScore.style.bottom = '8px';
+                evalBarScore.style.color = '#1a1a2e';
+            } else {
+                evalBarScore.style.top = '8px';
+                evalBarScore.style.color = '#ffffff';
+            }
+        } else {
+            if (isWhiteAdvantage) {
+                evalBarScore.style.top = '8px';
+                evalBarScore.style.color = '#1a1a2e';
+            } else {
+                evalBarScore.style.bottom = '8px';
+                evalBarScore.style.color = '#ffffff';
+            }
+        }
+    }
+
+    async function triggerPositionEvaluation() {
+        if (!evalBarContainer || !document.documentElement.classList.contains('has-eval-bar')) {
+            return;
+        }
+        const currentFen = liveFen;
+        try {
+            const result = await getStockfishEval(currentFen);
+            if (liveFen === currentFen) {
+                updateEvalBar(result, currentFen);
+            }
+        } catch (e) {
+            console.error("Evaluation error:", e);
         }
     }
 
@@ -681,6 +997,9 @@
     const copyFenBtn = document.getElementById('copyFenBtn');
     const copyPgnBtn = document.getElementById('copyPgnBtn');
     const muteBtn = document.getElementById('muteBtn');
+    const evalBarContainer = document.getElementById('evalBarContainer');
+    const evalBarWhite = document.getElementById('evalBarWhite');
+    const evalBarScore = document.getElementById('evalBarScore');
 
     const welcomeOverlay = document.getElementById('welcomeOverlay');
     const welcomeResumeBtn = document.getElementById('welcomeResumeBtn');
@@ -1219,6 +1538,7 @@
                         false
                     );
                     welcomeOverlay.classList.remove('active');
+                    maybeStartTourAfterWelcomeCloses();
                     gameLayout.style.visibility = 'visible';
                     return;
                 }
@@ -1324,6 +1644,7 @@
                 streakCounter.style.display = "block";
             }
         }
+        triggerPositionEvaluation();
     }
 
     function updatePlayerNames(data) {
@@ -1404,6 +1725,7 @@
     BOARD RENDERING
     ========================================================== */
     function buildBoard() {
+        updateEvalBarVisibility();
         const bc = document.querySelector('.board-container');
         if (bc) bc.classList.toggle('flipped', flipped);
         boardEl.innerHTML = '';
@@ -1757,12 +2079,32 @@
             { key: 'n', label: 'Knight' },
         ];
         promoChoices.innerHTML = '';
-        pieces.forEach(({ key }) => {
+        pieces.forEach(({ key, label }) => {
             const btn = document.createElement('button');
             btn.className = 'promo-btn';
+            btn.setAttribute('aria-label', `${label} (${key})`);
+            
             const img = document.createElement('img');
             img.src = PIECE_IMG[prefix + key];
+            img.alt = '';
+            img.setAttribute('aria-hidden', 'true');
             btn.appendChild(img);
+            
+            const labelSpan = document.createElement('span');
+            labelSpan.className = 'promo-label';
+            labelSpan.setAttribute('aria-hidden', 'true');
+            const keySpan = document.createElement('span');
+            keySpan.className = 'promo-key';
+            keySpan.textContent = `(${key})`;
+            
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'promo-text';
+            nameSpan.textContent = ` ${label}`;
+            
+            labelSpan.appendChild(keySpan);
+            labelSpan.appendChild(nameSpan);
+            btn.appendChild(labelSpan);
+            
             btn.onclick = () => onPromoChoice(key);
             promoChoices.appendChild(btn);
         });
@@ -2079,6 +2421,8 @@
                     if (a11yMsg) announceMove(a11yMsg);
                 }
 
+                triggerPositionEvaluation();
+
                 if (gameMode === 'ai' && turn !== playerColor && !gameOver) {
                     requestAIMove();
                 }
@@ -2242,6 +2586,8 @@
                         }
                     }
                     if (a11yMsg) announceMove(a11yMsg);
+
+                    triggerPositionEvaluation();
 
                     // Trigger queued premove if it exists
                     if (premoveQueue.length > 0) {
@@ -2420,6 +2766,14 @@
         if (typeof updateMaterialUI === 'function') {
             updateMaterialUI(board);
         }
+        updateEvalBarVisibility();
+        if (fen && !dailyPuzzleMode) {
+            getStockfishEval(fen).then(result => {
+                if (replayBoard && replayBoard.fen() === fen) {
+                    updateEvalBar(result, fen);
+                }
+            });
+        }
     }
     function goToReplayMove(index) {
 
@@ -2499,6 +2853,15 @@ function updateStepperUI() {
     if (fen) renderStepperPosition(fen);
 
     viewingPastState = (stepperIndex < gameFens.length - 1);
+
+    updateEvalBarVisibility();
+    if (fen && (gameMode === 'ai' || gameMode === 'analysis') && !dailyPuzzleMode) {
+        getStockfishEval(fen).then(result => {
+            if (gameFens[stepperIndex] === fen) {
+                updateEvalBar(result, fen);
+            }
+        });
+    }
 
     const resumeBtn = document.getElementById('resumeGameBtn');
     if (resumeBtn) resumeBtn.classList.toggle('hidden', !viewingPastState);
@@ -4164,6 +4527,7 @@ function updateStepperUI() {
             const started = await startNewGame(mode, pColor, diff, fenValue);
             if (!started) return;
             welcomeOverlay.classList.remove('active');
+                    maybeStartTourAfterWelcomeCloses();
             gameLayout.style.visibility = 'visible';
         });
     }
@@ -4174,6 +4538,7 @@ function updateStepperUI() {
         const started = await startNewGame('pvp', 'white', 'medium', fen);
         if (!started) return;
         welcomeOverlay.classList.remove('active');
+                    maybeStartTourAfterWelcomeCloses();
         gameLayout.style.visibility = 'visible';
     };
 
@@ -4183,6 +4548,7 @@ function updateStepperUI() {
             await startDailyPuzzle();
 
             welcomeOverlay.classList.remove('active');
+                    maybeStartTourAfterWelcomeCloses();
             gameLayout.style.visibility = 'visible';
         };
     }
@@ -4279,6 +4645,7 @@ function updateStepperUI() {
         const started = await startNewGame('ai', selectedPveColor, diff, fen);
         if (!started) return;
         welcomeOverlay.classList.remove('active');
+                    maybeStartTourAfterWelcomeCloses();
         gameLayout.style.visibility = 'visible';
     };
 
@@ -4341,6 +4708,7 @@ function updateStepperUI() {
             return;
         }
         welcomeOverlay.classList.remove('active');
+                    maybeStartTourAfterWelcomeCloses();
         gameLayout.style.visibility = 'visible';
         paused = false;
         updatePauseUI();
@@ -4471,6 +4839,7 @@ function updateStepperUI() {
 
         fenOverlay.classList.remove('active');
         welcomeOverlay.classList.remove('active');
+                    maybeStartTourAfterWelcomeCloses();
         gameLayout.style.visibility = 'visible';
     };
 
@@ -4911,7 +5280,18 @@ async function handleSanMove() {
     document.addEventListener('keydown', e => {
         if (e.repeat) return;
 
-        const tag = document.activeElement && document.activeElement.tagName;
+        if (promoOverlay && promoOverlay.classList.contains('active')) {
+            const key = e.key.toLowerCase();
+            if (key === 'q' || key === 'r' || key === 'b' || key === 'n') {
+                e.preventDefault();
+                onPromoChoice(key);
+                return;
+            }
+            // Ignore all other game commands when promotion is pending
+            return;
+        }
+
+        const tag = document.activeElement?.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
         if (replayMode) {
@@ -5669,6 +6049,9 @@ async function handleSanMove() {
     updateSessionTracker();
     // Render the current game count already stored for this browser session
     updateGameCounterDisplay();
+    // Wire up the onboarding tour's Skip/Next buttons and, if resuming a
+    // game with no setup screen showing, start it right away
+    initOnboardingTour();
     // Resume game by clicking the paused board overlay
     boardEl.addEventListener('click', async () => {
         if (!paused) return;

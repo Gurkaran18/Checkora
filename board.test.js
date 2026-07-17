@@ -76,6 +76,7 @@ document.body.innerHTML = `
   <div id="resBlunder"></div>
 `;
 
+const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0));
 
 global.fetch = jest.fn((url, options) => {
   let boardData = [
@@ -415,6 +416,127 @@ describe("Board UI Interactions", () => {
     expect(overlay.classList.contains("active")).toBe(false);
   });
 
+  it('handles hotkeys and visual labels for promotion', async () => {
+    const originalFetch = global.fetch;
+    const customBoard = [
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, 'P', null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null],
+      [null, null, null, null, null, null, null, null]
+    ];
+    
+    global.fetch = jest.fn((url) => {
+      if (url.includes('/api/new-game/')) {
+        return Promise.resolve({
+          json: () => Promise.resolve({
+            valid: true,
+            board: customBoard,
+            current_turn: 'white',
+            player_color: 'white',
+            game_mode: 'pvp',
+          })
+        });
+      }
+      if (url.includes('/api/state/')) {
+        return Promise.resolve({
+          json: () => Promise.resolve({
+            valid: true,
+            board: customBoard,
+            current_turn: 'white',
+            player_color: 'white',
+            game_mode: 'pvp',
+            white_time: 300,
+            black_time: 300,
+            paused: false,
+            captured_pieces: { white: [], black: [] },
+            move_history: []
+          })
+        });
+      }
+      if (url.includes('/api/valid-moves/')) {
+        return Promise.resolve({
+          json: () => Promise.resolve({
+            valid_moves: [{ row: 0, col: 4 }]
+          })
+        });
+      }
+      if (url.includes('/api/move/')) {
+        return Promise.resolve({
+          json: () => Promise.resolve({
+            valid: true,
+            board: customBoard,
+            current_turn: 'black',
+            player_color: 'white',
+            game_mode: 'pvp',
+          })
+        });
+      }
+      return Promise.resolve({
+        json: () => Promise.resolve({ valid: true })
+      });
+    });
+
+    try {
+      // Re-initialize with custom board layout FEN
+      await startNewGame('pvp', 'white', 'medium', '8/4P3/8/8/8/8/8/8 w - - 0 1', 10);
+
+      // Trigger DOM clicks instead of calling onClick directly to avoid stale closures
+      const boardEl = document.getElementById("board");
+      const e7Square = boardEl.children[1 * 8 + 4]; // row 1, col 4
+      const e8Square = boardEl.children[0 * 8 + 4]; // row 0, col 4
+
+      // Select pawn on e7 (row 1, col 4)
+      e7Square.click();
+      await flushPromises();
+ 
+      // Move to e8 (row 0, col 4) (promotes)
+      e8Square.click();
+      await flushPromises();
+ 
+      const overlay = document.getElementById("promoOverlay");
+      expect(overlay.classList.contains("active")).toBe(true);
+ 
+      const promoChoices = document.getElementById("promoChoices");
+      const buttons = promoChoices.querySelectorAll(".promo-btn");
+      expect(buttons.length).toBe(4);
+      expect(buttons[0].querySelector(".promo-key").textContent).toBe("(q)");
+      expect(buttons[0].querySelector(".promo-text").textContent).toContain("Queen");
+ 
+      global.fetch.mockClear();
+ 
+      // Dispatch an invalid key 'x' and assert overlay stays active and no fetch call is made
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'x' }));
+      await flushPromises();
+      expect(overlay.classList.contains("active")).toBe(true);
+      expect(global.fetch.mock.calls.length).toBe(0);
+ 
+      // Focus an input element to verify keydown intercepts even when inputs are focused
+      const inputEl = document.getElementById("sanMoveInput");
+      inputEl.focus();
+      expect(document.activeElement).toBe(inputEl);
+ 
+      // Dispatch an uppercase 'Q' and assert overlay closes and correct move is submitted
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Q' }));
+      await flushPromises();
+
+      expect(overlay.classList.contains("active")).toBe(false);
+
+      const moveCall = global.fetch.mock.calls.find(c => c[0].includes('/api/move/'));
+      expect(moveCall).toBeDefined();
+      const requestBody = JSON.parse(moveCall[1].body);
+      expect(requestBody.promotion_piece).toBe('q');
+
+      // Blur the input element at the end of the test to clean up focus state
+      inputEl.blur();
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
   it('onClick ignores invalid moves when game is over', async () => {
     global.fetch.mockClear();
     // Use valid bounds but empty square (or anything, just check it doesn't do a move fetch)
@@ -479,9 +601,6 @@ describe("SAN Quick Move Input", () => {
     await startNewGame('pvp', 'white', 'medium', 'startpos', 10);
   });
 
-  async function flushPromises() {
-    return new Promise(resolve => setTimeout(resolve, 0));
-  }
 
   it('valid pawn move (e4) using Enter key clears input and calls /api/move/', async () => {
     const input = document.getElementById("sanMoveInput");
