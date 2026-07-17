@@ -2091,9 +2091,9 @@
             btn.appendChild(img);
             
             const labelSpan = document.createElement('span');
+            const labelSpan = document.createElement('span');
             labelSpan.className = 'promo-label';
             labelSpan.setAttribute('aria-hidden', 'true');
-            
             const keySpan = document.createElement('span');
             keySpan.className = 'promo-key';
             keySpan.textContent = `(${key})`;
