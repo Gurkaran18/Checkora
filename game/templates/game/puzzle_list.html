@@ -683,7 +683,7 @@
             paginationContainer.appendChild(prevBtn);
 
             // Page info/numbers
-            for (let i = 1; i <= data.total_pages; i++) {
+            function addPageBtn(i) {
                 const pageBtn = document.createElement('button');
                 pageBtn.className = `pagination-btn ${i === data.page ? 'active' : ''}`;
                 pageBtn.innerText = i;
@@ -693,6 +693,39 @@
                 });
                 paginationContainer.appendChild(pageBtn);
             }
+
+            const totalPages = data.total_pages;
+            const maxVisible = 5;
+            let startPage = Math.max(1, currentPage - 2);
+            let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+            if (endPage - startPage < maxVisible - 1) {
+                startPage = Math.max(1, endPage - maxVisible + 1);
+            }
+
+            if (startPage > 1) {
+                addPageBtn(1);
+                if (startPage > 2) {
+                    const dots = document.createElement('span');
+                    dots.className = 'pagination-info';
+                    dots.innerText = '...';
+                    paginationContainer.appendChild(dots);
+                }
+            }
+
+            for (let i = startPage; i <= endPage; i++) {
+                addPageBtn(i);
+            }
+
+            if (endPage < totalPages) {
+                if (endPage < totalPages - 1) {
+                    const dots = document.createElement('span');
+                    dots.className = 'pagination-info';
+                    dots.innerText = '...';
+                    paginationContainer.appendChild(dots);
+                }
+                addPageBtn(totalPages);
+            }
+
 
             // Next Button
             const nextBtn = document.createElement('button');

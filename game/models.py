@@ -448,8 +448,12 @@ class ChessPuzzle(models.Model):
         blank=True,
         default=""
     )
-    rating = models.IntegerField(default=1500, db_index=True)
-    tags = models.CharField(max_length=255, blank=True, default="", db_index=True)
+    rating = models.IntegerField(
+        default=1500,
+        db_index=True,
+        validators=[MinValueValidator(0), MaxValueValidator(3000)]
+    )
+    tags = models.CharField(max_length=255, blank=True, default="")
     date = models.DateField(
         blank=True,
         null=True,
