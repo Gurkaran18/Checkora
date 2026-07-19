@@ -2256,16 +2256,71 @@ def puzzles_list_api(request):
     if search_query:
         puzzles = puzzles.filter(title__icontains=search_query)
 
+    # Filter by tag (motif)
+    tag = request.GET.get('tag')
+    if tag:
+        puzzles = puzzles.filter(tags__icontains=tag)
+
+    # Filter by min_rating
+    min_rating = request.GET.get('min_rating')
+    if min_rating:
+        try:
+            puzzles = puzzles.filter(rating__gte=int(min_rating))
+        except ValueError:
+            pass
+
+    # Filter by max_rating
+    max_rating = request.GET.get('max_rating')
+    if max_rating:
+        try:
+            puzzles = puzzles.filter(rating__lte=int(max_rating))
+        except ValueError:
+            pass
+
+    # Order puzzles logically so pagination is stable
+    puzzles = puzzles.order_by('id')
+
+    # Pagination
+    page = request.GET.get('page', 1)
+    per_page = request.GET.get('per_page', 9)
+
+    try:
+        page = int(page)
+    except ValueError:
+        page = 1
+
+    try:
+        per_page = int(per_page)
+    except ValueError:
+        per_page = 9
+
+    from django.core.paginator import Paginator, EmptyPage
+    paginator = Paginator(puzzles, per_page)
+    try:
+        puzzles_page = paginator.page(page)
+    except EmptyPage:
+        puzzles_page = []
+
     puzzles_data = []
-    for puzzle in puzzles:
+    for puzzle in puzzles_page:
         puzzles_data.append({
             "id": puzzle.id,
             "title": puzzle.title,
             "fen": puzzle.fen,
             "difficulty": puzzle.difficulty or "medium",
-            "date": puzzle.date.isoformat() if puzzle.date else None
+            "date": puzzle.date.isoformat() if puzzle.date else None,
+            "rating": puzzle.rating,
+            "tags": [t.strip() for t in puzzle.tags.split(',')] if puzzle.tags else []
         })
-    return JsonResponse(puzzles_data, safe=False)
+
+    return JsonResponse({
+        "puzzles": puzzles_data,
+        "page": page,
+        "total_pages": paginator.num_pages,
+        "total_count": paginator.count,
+        "has_next": puzzles_page.has_next() if hasattr(puzzles_page, 'has_next') else False,
+        "has_previous": puzzles_page.has_previous() if hasattr(puzzles_page, 'has_previous') else False,
+    }, safe=False)
 
 
 @require_GET
@@ -2277,7 +2332,9 @@ def puzzle_detail_api(request, puzzle_id):
         "title": puzzle.title,
         "fen": puzzle.fen,
         "difficulty": puzzle.difficulty or "medium",
-        "date": puzzle.date.isoformat() if puzzle.date else None
+        "date": puzzle.date.isoformat() if puzzle.date else None,
+        "rating": puzzle.rating,
+        "tags": [t.strip() for t in puzzle.tags.split(',')] if puzzle.tags else []
     })
 
 
