@@ -464,6 +464,8 @@ class ChessPuzzle(models.Model):
 
     def clean(self):
         super().clean()
+        if self.tags:
+            self.tags = ",".join([t.strip() for t in self.tags.split(",") if t.strip()])
         if self.fen:
             parts = self.fen.split()
             if len(parts) < 4:

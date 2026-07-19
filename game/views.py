@@ -2262,8 +2262,13 @@ def puzzles_list_api(request):
         puzzles = puzzles.filter(
             Q(tags=tag) |
             Q(tags__startswith=tag + ",") |
+            Q(tags__startswith=tag + ", ") |
             Q(tags__endswith="," + tag) |
-            Q(tags__contains="," + tag + ",")
+            Q(tags__endswith=", " + tag) |
+            Q(tags__contains="," + tag + ",") |
+            Q(tags__contains=", " + tag + ",") |
+            Q(tags__contains="," + tag + " ,") |
+            Q(tags__contains=", " + tag + " ,")
         )
 
     # Filter by min_rating
