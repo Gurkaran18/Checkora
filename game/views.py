@@ -720,14 +720,21 @@ def ai_move(request):
             temp_game.current_turn = game.current_turn
             temp_game.en_passant_target = game.en_passant_target
             
-            # Apply the suggested move
-            temp_game.make_move(best['from_row'], best['from_col'], best['to_row'], best['to_col'])
+            # Synchronize history and clocks to prevent state desync
+            temp_game.move_history = list(game.move_history)
+            temp_game.halfmove_clock = game.halfmove_clock
+            temp_game.repetition_history = list(game.repetition_history)
+            temp_game.repetition_counts = dict(game.repetition_counts)
+            temp_game.captured = {k: list(v) for k, v in game.captured.items()} if hasattr(game, 'captured') and isinstance(game.captured, dict) else {'white': [], 'black': []}
+            
+            # Apply the suggested move, handling promotions
+            temp_game.make_move(best['from_row'], best['from_col'], best['to_row'], best['to_col'], promotion_piece=best.get('promotion_piece'))
             
             # Request opponent's responses
             opp_resp = temp_game.get_ai_move(depth=depth)
             
             predicted_responses = []
-            if opp_resp and 'alts' in opp_resp:
+            if opp_resp:
                 predicted_responses.append({
                     'notation': temp_game._notation(
                         opp_resp['from_row'], opp_resp['from_col'], 
