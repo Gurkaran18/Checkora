@@ -723,6 +723,8 @@ def ai_move(request):
             # Synchronize history and clocks to prevent state desync
             temp_game.move_history = list(game.move_history)
             temp_game.halfmove_clock = game.halfmove_clock
+            temp_game.repetition_history = list(game.repetition_history)
+            temp_game.repetition_counts = dict(game.repetition_counts)
             temp_game.captured = {k: list(v) for k, v in game.captured.items()} if hasattr(game, 'captured') and isinstance(game.captured, dict) else {'white': [], 'black': []}
             
             # Apply the suggested move, handling promotions
