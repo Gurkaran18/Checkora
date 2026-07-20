@@ -2656,7 +2656,14 @@ def analyze_game_view(request):
                 except Exception as ex:
                     logger.warning('Failed to get notation for best move: %s', ex)
 
-            move_analysis_details.append({'move_num': move_num, 'color': color, 'played': notation, 'best': best_notation, 'class': move_class})
+            move_analysis_details.append({
+                'move_num': move_num,
+                'color': color,
+                'played': notation,
+                'best': best_notation,
+                'class': move_class,
+                'eval': best_move.get('eval') if best_move else None
+            })
 
             game.make_move(actual_from[0], actual_from[1], actual_to[0], actual_to[1])
             game.last_ts = time.time()
@@ -2664,6 +2671,15 @@ def analyze_game_view(request):
         bad_moves = blunders + mistakes
         accuracy = round(((analyzed_moves_count - bad_moves) / analyzed_moves_count) * 100) if analyzed_moves_count > 0 else 100
         opening = detect_opening(moves) or 'Unknown'
+
+        # Get evaluation of the final position
+        final_eval = None
+        try:
+            final_move = game.get_ai_move(depth=2)
+            if final_move:
+                final_eval = final_move.get('eval')
+        except Exception as ex:
+            logger.warning('Failed to get final evaluation: %s', ex)
 
         response_data = {
             'result': result,
@@ -2673,7 +2689,8 @@ def analyze_game_view(request):
             'promotions': promotions, 'blunders': blunders, 'mistakes': mistakes,
             'accuracy': accuracy, 'total_moves': (len(moves) + 1) // 2, 'move_analysis_details': move_analysis_details,
             'move_analysis': [detail['class'] for detail in move_analysis_details],
-            'analysis_timeout_seconds': ANALYSIS_TIMEOUT_SECONDS
+            'analysis_timeout_seconds': ANALYSIS_TIMEOUT_SECONDS,
+            'final_eval': final_eval
         }
 
         response = JsonResponse(response_data)
