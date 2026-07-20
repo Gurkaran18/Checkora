@@ -583,7 +583,7 @@ DP cache is intentionally excluded to save cookie space."""
             if conn.poll(timeout_secs):
                 return conn.recv()
 
-            with contextlib.suppress(Exception):
+            with contextlib.suppress(OSError):
                 conn.close()
             self.cleanup_engine()
             return None
