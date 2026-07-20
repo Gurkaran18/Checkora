@@ -391,6 +391,7 @@
     let stockfishWorker = null;
     let stockfishEvalSeq = 0;
     let stockfishActiveReject = null;
+    let currentAnalysisData = null;
 
     let hintLevel = 0;
 
@@ -679,16 +680,20 @@
             const sideToMove = fen ? fen.split(' ')[1] : 'w';
             if (type === 'mate') {
                 let isWhiteMate = false;
-                if (sideToMove === 'w') {
+                if (evalResult.absolute) {
                     isWhiteMate = value > 0;
                 } else {
-                    isWhiteMate = value < 0;
+                    if (sideToMove === 'w') {
+                        isWhiteMate = value > 0;
+                    } else {
+                        isWhiteMate = value < 0;
+                    }
                 }
-                displayLabel = `M${Math.abs(value)}`;
+                displayLabel = evalResult.absolute ? 'M' : `M${Math.abs(value)}`;
                 percentage = isWhiteMate ? 100 : 0;
             } else {
                 let cp = value;
-                if (sideToMove === 'b') {
+                if (!evalResult.absolute && sideToMove === 'b') {
                     cp = -cp;
                 }
                 const rawScore = cp / 100;
@@ -2855,7 +2860,31 @@ function updateStepperUI() {
     viewingPastState = (stepperIndex < gameFens.length - 1);
 
     updateEvalBarVisibility();
-    if (fen && (gameMode === 'ai' || gameMode === 'analysis') && !dailyPuzzleMode) {
+    
+    if (gameMode === 'analysis' && currentAnalysisData) {
+        let scoreVal = null;
+        let isMate = false;
+        
+        if (stepperIndex < currentAnalysisData.move_analysis_details.length) {
+            scoreVal = currentAnalysisData.move_analysis_details[stepperIndex].eval;
+        } else if (stepperIndex === currentAnalysisData.move_analysis_details.length) {
+            scoreVal = currentAnalysisData.final_eval;
+        }
+        
+        if (scoreVal !== null && scoreVal !== undefined) {
+            if (Math.abs(scoreVal) > 90000) {
+                isMate = true;
+            }
+            const evalObj = {
+                type: isMate ? 'mate' : 'cp',
+                value: scoreVal,
+                absolute: true
+            };
+            updateEvalBar(evalObj, fen);
+        } else {
+            updateEvalBar(null, fen);
+        }
+    } else if (fen && (gameMode === 'ai' || gameMode === 'analysis') && !dailyPuzzleMode) {
         getStockfishEval(fen).then(result => {
             if (gameFens[stepperIndex] === fen) {
                 updateEvalBar(result, fen);
@@ -3044,6 +3073,7 @@ function updateStepperUI() {
     async function endGame(reason, loserColor, drawReason = null) {
         if (gameOver) return;
         gameOver = true;
+        currentAnalysisData = null;
         
         let title = '', message = '';
         let isCelebration = false;
@@ -3447,6 +3477,8 @@ function updateStepperUI() {
         }).then(analysisData => {
             if (!analysisData) return;
             if (currentAnalysisSeq !== analysisRequestSeq) return;
+            
+            currentAnalysisData = analysisData;
 
             const openingNameEl = document.getElementById('resOpeningName');
             if (openingNameEl) {
@@ -3510,7 +3542,24 @@ function updateStepperUI() {
                     const tdClass = document.createElement('td');
                     tdClass.style.padding = '5px';
                     tdClass.style.color = detail.class === 'Best' ? '#4caf50' : '#f44336';
-                    tdClass.textContent = detail.class;
+                    
+                    let nextEval = null;
+                    if (index + 1 < analysisData.move_analysis_details.length) {
+                        nextEval = analysisData.move_analysis_details[index + 1].eval;
+                    } else {
+                        nextEval = analysisData.final_eval;
+                    }
+
+                    let evalText = '';
+                    if (nextEval !== undefined && nextEval !== null) {
+                        if (Math.abs(nextEval) > 90000) {
+                            evalText = ' (M)';
+                        } else {
+                            const score = nextEval / 100;
+                            evalText = ` (${score >= 0 ? '+' : ''}${score.toFixed(1)})`;
+                        }
+                    }
+                    tdClass.textContent = detail.class + evalText;
                     tr.appendChild(tdClass);
 
                     tbody.appendChild(tr);

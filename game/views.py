@@ -93,6 +93,7 @@ MAX_MOVE_LENGTH = 20
 
 from game.services import (
     cleanup_stale_games,
+    process_game_completion,
     check_game_achievements,
     check_puzzle_achievements,
     generate_badge,
@@ -138,56 +139,6 @@ def index(request):
     return render(request, 'game/board.html')
 
 
-def update_player_rating(user, winner, player_color):
-    rating, _ = PlayerRating.objects.get_or_create(
-        user=user
-    )
-
-    old_rating = rating.rating
-
-    if winner == "draw":
-        result = "draw"
-
-    elif winner == player_color:
-        result = "win"
-
-    else:
-        result = "loss"
-
-    change = calculate_rating_change(result)
-
-    new_rating = max(
-        100,
-        old_rating + change
-    )
-
-    actual_change = (
-        new_rating - old_rating
-    )
-    rating.rating = new_rating
-    rating.games_played += 1
-
-    if result == "win":
-        rating.wins += 1
-
-    elif result == "loss":
-        rating.losses += 1
-
-    else:
-        rating.draws += 1
-
-    rating.full_clean()
-    rating.save()
-
-    RatingHistory.objects.create(
-        user=user,
-        old_rating=old_rating,
-        new_rating=rating.rating,
-        rating_change=actual_change,
-        result=result
-    )
-    
-
 def record_game_result(request, mode, winner, reason, player_color='white', moves=None):
     """Save a completed game result to the database."""
     user = request.user if request.user.is_authenticated else None
@@ -197,31 +148,8 @@ def record_game_result(request, mode, winner, reason, player_color='white', move
             moves = game_data.get('move_history', [])
         else:
             moves = []
-    result = GameResult.objects.create(
-        user=user,
-        mode=mode,
-        winner=winner,
-        end_reason=reason,
-        player_color=player_color,
-        moves=moves
-    )
-    result.full_clean()
-    result.save()
-
-    if user:
-        with transaction.atomic():
-            progress, _ = UserProgress.objects.select_for_update().get_or_create(user=user)
-            progress.update_streak()
-
-    if user and mode == 'ai':
-        update_player_rating(
-            user,
-            winner,
-            player_color
-        )
-        
-        check_game_achievements(user)
-    return result
+            
+    return process_game_completion(user, mode, winner, reason, player_color, moves)
 
 
 @require_POST
@@ -2656,7 +2584,14 @@ def analyze_game_view(request):
                 except Exception as ex:
                     logger.warning('Failed to get notation for best move: %s', ex)
 
-            move_analysis_details.append({'move_num': move_num, 'color': color, 'played': notation, 'best': best_notation, 'class': move_class})
+            move_analysis_details.append({
+                'move_num': move_num,
+                'color': color,
+                'played': notation,
+                'best': best_notation,
+                'class': move_class,
+                'eval': best_move.get('eval') if best_move else None
+            })
 
             game.make_move(actual_from[0], actual_from[1], actual_to[0], actual_to[1])
             game.last_ts = time.time()
@@ -2664,6 +2599,15 @@ def analyze_game_view(request):
         bad_moves = blunders + mistakes
         accuracy = round(((analyzed_moves_count - bad_moves) / analyzed_moves_count) * 100) if analyzed_moves_count > 0 else 100
         opening = detect_opening(moves) or 'Unknown'
+
+        # Get evaluation of the final position
+        final_eval = None
+        try:
+            final_move = game.get_ai_move(depth=2)
+            if final_move:
+                final_eval = final_move.get('eval')
+        except Exception as ex:
+            logger.warning('Failed to get final evaluation: %s', ex)
 
         response_data = {
             'result': result,
@@ -2673,7 +2617,8 @@ def analyze_game_view(request):
             'promotions': promotions, 'blunders': blunders, 'mistakes': mistakes,
             'accuracy': accuracy, 'total_moves': (len(moves) + 1) // 2, 'move_analysis_details': move_analysis_details,
             'move_analysis': [detail['class'] for detail in move_analysis_details],
-            'analysis_timeout_seconds': ANALYSIS_TIMEOUT_SECONDS
+            'analysis_timeout_seconds': ANALYSIS_TIMEOUT_SECONDS,
+            'final_eval': final_eval
         }
 
         response = JsonResponse(response_data)
