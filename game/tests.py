@@ -4044,3 +4044,41 @@ class DiscussionBookmarkRedirectTests(TestCase):
     def test_no_next_and_no_referer_fallback(self):
         response = self.client.post(self.url)
         self.assertRedirects(response, reverse('forum'), fetch_redirect_response=False)
+
+
+from multiprocessing.connection import Connection
+
+class EnginePersistentTimeoutTest(SimpleTestCase):
+    @mock.patch("multiprocessing.connection.Client")
+    @mock.patch("game.engine.os.path.exists", return_value=True)
+    @mock.patch("builtins.open", new_callable=mock.mock_open, read_data="1234")
+    def test_normal_response(self, mock_open, mock_exists, mock_client):
+        game = ChessGame()
+        
+        mock_conn = mock.Mock(spec=Connection)
+        mock_conn.poll.return_value = True
+        mock_conn.recv.return_value = "STATUS ok"
+        mock_client.return_value = mock_conn
+        
+        resp = game._call_engine("STATUS")
+        self.assertEqual(resp, "STATUS ok")
+        mock_conn.send.assert_called_with("STATUS")
+        mock_conn.recv.assert_called_once()
+            
+    @mock.patch("multiprocessing.connection.Client")
+    @mock.patch("game.engine.os.path.exists", return_value=True)
+    @mock.patch("builtins.open", new_callable=mock.mock_open, read_data="1234")
+    def test_unresponsive_engine_triggers_timeout(self, mock_open, mock_exists, mock_client):
+        game = ChessGame()
+        
+        mock_conn = mock.Mock(spec=Connection)
+        mock_conn.poll.return_value = False
+        mock_client.return_value = mock_conn
+        
+        with mock.patch.object(game, "cleanup_engine") as mock_cleanup:
+            resp = game._call_engine("STATUS")
+            self.assertIsNone(resp)
+            mock_conn.send.assert_called_with("STATUS")
+            mock_conn.recv.assert_not_called()
+            mock_cleanup.assert_called_once()
+            mock_conn.close.assert_called()

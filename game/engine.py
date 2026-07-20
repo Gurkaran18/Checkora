@@ -576,8 +576,19 @@ DP cache is intentionally excluded to save cookie space."""
 
         try:
             conn.send(command)
-            resp = conn.recv()
-            return resp
+            timeout_secs = getattr(
+                self, "_analysis_timeout", self.ANALYSIS_TIMEOUT_SECONDS
+            )
+            if conn.poll(timeout_secs):
+                resp = conn.recv()
+                return resp
+            else:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+                self.cleanup_engine()
+                return None
         except Exception:
             return None
         finally:
