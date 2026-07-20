@@ -2300,7 +2300,7 @@ def puzzles_list_api(request):
         page = 1
 
     try:
-        per_page = max(1, int(per_page))
+        per_page = max(1, min(int(per_page), 100))
     except ValueError:
         per_page = 9
 
