@@ -4052,7 +4052,7 @@ class EnginePersistentTimeoutTest(SimpleTestCase):
     @mock.patch("multiprocessing.connection.Client")
     @mock.patch("game.engine.os.path.exists", return_value=True)
     @mock.patch("builtins.open", new_callable=mock.mock_open, read_data="1234")
-    def test_normal_response(self, mock_open, mock_exists, mock_client):
+    def test_normal_response(self, _mock_open, _mock_exists, mock_client):
         game = ChessGame()
         
         mock_conn = mock.Mock(spec=Connection)
@@ -4068,7 +4068,7 @@ class EnginePersistentTimeoutTest(SimpleTestCase):
     @mock.patch("multiprocessing.connection.Client")
     @mock.patch("game.engine.os.path.exists", return_value=True)
     @mock.patch("builtins.open", new_callable=mock.mock_open, read_data="1234")
-    def test_unresponsive_engine_triggers_timeout(self, mock_open, mock_exists, mock_client):
+    def test_unresponsive_engine_triggers_timeout(self, _mock_open, _mock_exists, mock_client):
         game = ChessGame()
         
         mock_conn = mock.Mock(spec=Connection)

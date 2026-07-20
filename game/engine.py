@@ -17,6 +17,7 @@ is chosen at random to add variety.
 """
 
 import os
+import contextlib
 import random
 import subprocess
 import json
@@ -580,15 +581,12 @@ DP cache is intentionally excluded to save cookie space."""
                 self, "_analysis_timeout", self.ANALYSIS_TIMEOUT_SECONDS
             )
             if conn.poll(timeout_secs):
-                resp = conn.recv()
-                return resp
-            else:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-                self.cleanup_engine()
-                return None
+                return conn.recv()
+
+            with contextlib.suppress(Exception):
+                conn.close()
+            self.cleanup_engine()
+            return None
         except Exception:
             return None
         finally:
