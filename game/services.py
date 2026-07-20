@@ -161,8 +161,9 @@ def delete_active_game(request):
             session_key=request.session.session_key
         ).delete()
 
+@transaction.atomic
 def update_player_rating(user, winner, player_color):
-    rating, _ = PlayerRating.objects.get_or_create(
+    rating, _ = PlayerRating.objects.select_for_update().get_or_create(
         user=user
     )
 
@@ -210,6 +211,7 @@ def update_player_rating(user, winner, player_color):
         result=result
     )
 
+@transaction.atomic
 def process_game_completion(user, mode, winner, reason, player_color='white', moves=None):
     """Shared logic to finalize a game and update progressions."""
     if moves is None:
@@ -227,9 +229,8 @@ def process_game_completion(user, mode, winner, reason, player_color='white', mo
     result.save()
 
     if user:
-        with transaction.atomic():
-            progress, _ = UserProgress.objects.select_for_update().get_or_create(user=user)
-            progress.update_streak()
+        progress, _ = UserProgress.objects.select_for_update().get_or_create(user=user)
+        progress.update_streak()
 
     if user and mode == 'ai':
         update_player_rating(
