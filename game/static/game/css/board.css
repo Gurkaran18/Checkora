@@ -2319,11 +2319,12 @@ body {
 @media (max-width: 768px) {
   .m-fab {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
     gap: 10px;
     position: fixed;
-    top: 90px;
-    right: 12px;
+    right: 16px;
+    bottom: 20px;
+    top: auto;
     z-index: 10000;
   }
 }
