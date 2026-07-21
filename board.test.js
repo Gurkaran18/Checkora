@@ -79,15 +79,15 @@ document.body.innerHTML = `
     <button id="closeThemeModalBtn"></button>
     <button id="saveThemeSettingsBtn"></button>
     <div class="theme-swatches-grid">
-      <label><input type="radio" name="boardThemeRadio" value="classic" class="theme-radio-input"><span class="theme-btn" data-theme="classic"></span></label>
-      <label><input type="radio" name="boardThemeRadio" value="wood" class="theme-radio-input"><span class="theme-btn" data-theme="wood"></span></label>
-      <label><input type="radio" name="boardThemeRadio" value="slate" class="theme-radio-input"><span class="theme-btn" data-theme="slate"></span></label>
-      <label><input type="radio" name="boardThemeRadio" value="neon" class="theme-radio-input"><span class="theme-btn" data-theme="neon"></span></label>
-      <label><input type="radio" name="boardThemeRadio" value="glass" class="theme-radio-input"><span class="theme-btn" data-theme="glass"></span></label>
-      <label><input type="radio" name="boardThemeRadio" value="dark" class="theme-radio-input"><span class="theme-btn" data-theme="dark"></span></label>
-      <label><input type="radio" name="boardThemeRadio" value="green" class="theme-radio-input"><span class="theme-btn" data-theme="green"></span></label>
-      <label><input type="radio" name="boardThemeRadio" value="blue" class="theme-radio-input"><span class="theme-btn" data-theme="blue"></span></label>
-      <label><input type="radio" name="boardThemeRadio" value="pastel" class="theme-radio-input"><span class="theme-btn" data-theme="pastel"></span></label>
+      <label><input type="radio" name="boardThemeRadio" value="classic" class="theme-radio-input" aria-label="classic theme"><span class="theme-btn" data-theme="classic"></span></label>
+      <label><input type="radio" name="boardThemeRadio" value="wood" class="theme-radio-input" aria-label="wood theme"><span class="theme-btn" data-theme="wood"></span></label>
+      <label><input type="radio" name="boardThemeRadio" value="slate" class="theme-radio-input" aria-label="slate theme"><span class="theme-btn" data-theme="slate"></span></label>
+      <label><input type="radio" name="boardThemeRadio" value="neon" class="theme-radio-input" aria-label="neon theme"><span class="theme-btn" data-theme="neon"></span></label>
+      <label><input type="radio" name="boardThemeRadio" value="glass" class="theme-radio-input" aria-label="glass theme"><span class="theme-btn" data-theme="glass"></span></label>
+      <label><input type="radio" name="boardThemeRadio" value="dark" class="theme-radio-input" aria-label="dark theme"><span class="theme-btn" data-theme="dark"></span></label>
+      <label><input type="radio" name="boardThemeRadio" value="green" class="theme-radio-input" aria-label="green theme"><span class="theme-btn" data-theme="green"></span></label>
+      <label><input type="radio" name="boardThemeRadio" value="blue" class="theme-radio-input" aria-label="blue theme"><span class="theme-btn" data-theme="blue"></span></label>
+      <label><input type="radio" name="boardThemeRadio" value="pastel" class="theme-radio-input" aria-label="pastel theme"><span class="theme-btn" data-theme="pastel"></span></label>
     </div>
   </div>
 `;
