@@ -74,6 +74,22 @@ document.body.innerHTML = `
   <div id="resAnalysisPromotions"></div>
   <div id="resBestMove"></div>
   <div id="resBlunder"></div>
+  <div id="themeSettingsModal" class="theme-settings-modal">
+    <button id="openThemeModalBtn"></button>
+    <button id="closeThemeModalBtn"></button>
+    <button id="saveThemeSettingsBtn"></button>
+    <div class="theme-swatches-grid">
+      <label><input type="radio" name="boardThemeRadio" value="classic" class="theme-radio-input"><span class="theme-btn" data-theme="classic"></span></label>
+      <label><input type="radio" name="boardThemeRadio" value="wood" class="theme-radio-input"><span class="theme-btn" data-theme="wood"></span></label>
+      <label><input type="radio" name="boardThemeRadio" value="slate" class="theme-radio-input"><span class="theme-btn" data-theme="slate"></span></label>
+      <label><input type="radio" name="boardThemeRadio" value="neon" class="theme-radio-input"><span class="theme-btn" data-theme="neon"></span></label>
+      <label><input type="radio" name="boardThemeRadio" value="glass" class="theme-radio-input"><span class="theme-btn" data-theme="glass"></span></label>
+      <label><input type="radio" name="boardThemeRadio" value="dark" class="theme-radio-input"><span class="theme-btn" data-theme="dark"></span></label>
+      <label><input type="radio" name="boardThemeRadio" value="green" class="theme-radio-input"><span class="theme-btn" data-theme="green"></span></label>
+      <label><input type="radio" name="boardThemeRadio" value="blue" class="theme-radio-input"><span class="theme-btn" data-theme="blue"></span></label>
+      <label><input type="radio" name="boardThemeRadio" value="pastel" class="theme-radio-input"><span class="theme-btn" data-theme="pastel"></span></label>
+    </div>
+  </div>
 `;
 
 const flushPromises = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -1046,11 +1062,14 @@ describe("Client-side legal move computation (Issue #1445)", () => {
   });
 
   describe("Customizable Chessboard Themes", () => {
-    it("supports switching board theme data attributes and persisting to localStorage", () => {
+    it("supports switching board themes via modal radio buttons and persisting to localStorage", () => {
       const validThemes = ['classic', 'wood', 'slate', 'neon', 'glass', 'dark', 'green', 'blue', 'pastel'];
       validThemes.forEach(theme => {
-        document.documentElement.setAttribute('data-board-theme', theme);
-        localStorage.setItem('boardTheme', theme);
+        const radio = document.querySelector(`input[name="boardThemeRadio"][value="${theme}"]`);
+        expect(radio).not.toBeNull();
+        radio.checked = true;
+        radio.dispatchEvent(new Event('change', { bubbles: true }));
+        
         expect(document.documentElement.getAttribute('data-board-theme')).toBe(theme);
         expect(localStorage.getItem('boardTheme')).toBe(theme);
       });
