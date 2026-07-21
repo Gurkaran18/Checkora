@@ -643,50 +643,53 @@ def ai_move(request):
 
             # Create a temporary copy
             temp_game = ChessGame()
-            temp_game.board = temp_game._parse_board64(game.serialize_board())
-            temp_game.castling_rights = dict(game.castling_rights)
-            temp_game.current_turn = game.current_turn
-            temp_game.en_passant_target = game.en_passant_target
-            
-            # Synchronize history and clocks to prevent state desync
-            temp_game.move_history = list(game.move_history)
-            temp_game.halfmove_clock = game.halfmove_clock
-            temp_game.repetition_history = list(game.repetition_history)
-            temp_game.repetition_counts = dict(game.repetition_counts)
-            temp_game.captured = {k: list(v) for k, v in game.captured.items()} if hasattr(game, 'captured') and isinstance(game.captured, dict) else {'white': [], 'black': []}
-            
-            # Apply the suggested move, handling promotions
-            temp_game.make_move(best['from_row'], best['from_col'], best['to_row'], best['to_col'], promotion_piece=best.get('promotion_piece'))
-            
-            # Request opponent's responses
-            opp_resp = temp_game.get_ai_move(depth=depth)
-            
-            predicted_responses = []
-            if opp_resp:
-                predicted_responses.append({
-                    'notation': temp_game._notation(
-                        opp_resp['from_row'], opp_resp['from_col'], 
-                        opp_resp['to_row'], opp_resp['to_col'], 
-                        temp_game.board[opp_resp['from_row']][opp_resp['from_col']], 
-                        temp_game.board[opp_resp['to_row']][opp_resp['to_col']], 
-                        temp_game.serialize_board(), temp_game.serialize_castling_rights(), temp_game._serialize_ep()
-                    ),
-                    'eval': opp_resp.get('eval')
-                })
-                # Cap the alts before running the notation loop
-                for alt in opp_resp.get('alts', [])[:2]:
+            try:
+                temp_game.board = temp_game._parse_board64(game.serialize_board())
+                temp_game.castling_rights = dict(game.castling_rights)
+                temp_game.current_turn = game.current_turn
+                temp_game.en_passant_target = game.en_passant_target
+
+                # Synchronize history and clocks to prevent state desync
+                temp_game.move_history = list(game.move_history)
+                temp_game.halfmove_clock = game.halfmove_clock
+                temp_game.repetition_history = list(game.repetition_history)
+                temp_game.repetition_counts = dict(game.repetition_counts)
+                temp_game.captured = {k: list(v) for k, v in game.captured.items()} if hasattr(game, 'captured') and isinstance(game.captured, dict) else {'white': [], 'black': []}
+
+                # Apply the suggested move, handling promotions
+                temp_game.make_move(best['from_row'], best['from_col'], best['to_row'], best['to_col'], promotion_piece=best.get('promotion_piece'))
+
+                # Request opponent's responses
+                opp_resp = temp_game.get_ai_move(depth=depth)
+
+                predicted_responses = []
+                if opp_resp:
                     predicted_responses.append({
                         'notation': temp_game._notation(
-                            alt['from_row'], alt['from_col'], 
-                            alt['to_row'], alt['to_col'], 
-                            temp_game.board[alt['from_row']][alt['from_col']], 
-                            temp_game.board[alt['to_row']][alt['to_col']], 
+                            opp_resp['from_row'], opp_resp['from_col'],
+                            opp_resp['to_row'], opp_resp['to_col'],
+                            temp_game.board[opp_resp['from_row']][opp_resp['from_col']],
+                            temp_game.board[opp_resp['to_row']][opp_resp['to_col']],
                             temp_game.serialize_board(), temp_game.serialize_castling_rights(), temp_game._serialize_ep()
                         ),
-                        'eval': alt.get('eval')
+                        'eval': opp_resp.get('eval')
                     })
-            
-            best['predicted_responses'] = predicted_responses
+                    # Cap the alts before running the notation loop
+                    for alt in opp_resp.get('alts', [])[:2]:
+                        predicted_responses.append({
+                            'notation': temp_game._notation(
+                                alt['from_row'], alt['from_col'],
+                                alt['to_row'], alt['to_col'],
+                                temp_game.board[alt['from_row']][alt['from_col']],
+                                temp_game.board[alt['to_row']][alt['to_col']],
+                                temp_game.serialize_board(), temp_game.serialize_castling_rights(), temp_game._serialize_ep()
+                            ),
+                            'eval': alt.get('eval')
+                        })
+
+                best['predicted_responses'] = predicted_responses
+            finally:
+                temp_game.cleanup_engine()
         except Exception:
             logger.exception("Failed to predict opponent responses")
 
