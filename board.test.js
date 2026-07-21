@@ -1044,4 +1044,16 @@ describe("Client-side legal move computation (Issue #1445)", () => {
       expect(PIECE_IMG["wk"]).toBe("https://images.chesscomfiles.com/chess-themes/pieces/neo/150/wk.png");
     });
   });
+
+  describe("Customizable Chessboard Themes", () => {
+    it("supports switching board theme data attributes and persisting to localStorage", () => {
+      const validThemes = ['classic', 'wood', 'slate', 'neon', 'glass', 'dark', 'green', 'blue', 'pastel'];
+      validThemes.forEach(theme => {
+        document.documentElement.setAttribute('data-board-theme', theme);
+        localStorage.setItem('boardTheme', theme);
+        expect(document.documentElement.getAttribute('data-board-theme')).toBe(theme);
+        expect(localStorage.getItem('boardTheme')).toBe(theme);
+      });
+    });
+  });
 });
