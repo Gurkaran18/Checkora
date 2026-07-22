@@ -384,9 +384,9 @@ body {
 .game-layout {
     display: grid;
     grid-template-columns: 
-        minmax(0, clamp(240px, 22vw, 360px)) 
+        minmax(0, var(--side-panel-width)) 
         minmax(0, auto) 
-        minmax(0, clamp(240px, 22vw, 360px));
+        minmax(0, var(--side-panel-width));
     gap: var(--layout-gap);
     padding: var(--layout-padding-y) var(--layout-padding-x) 60px;
     align-items: start;
@@ -911,6 +911,8 @@ body {
     --panel-width: clamp(128px, 11vw, 196px);
     --sidebar-width: clamp(360px, 28vw, 440px);
     --side-panel-width: clamp(240px, 22vw, 360px);
+    --sidebar-offset-desktop: clamp(140px, 13vw, 180px);
+    --sidebar-offset-tablet: clamp(120px, 14vw, 145px);
     --rank-label-width: 1.35rem;
     --board-border: 3px;
     --board-chrome: calc(var(--rank-label-width) + var(--board-border) * 2 + 12px);
@@ -3661,10 +3663,6 @@ body.blindfold-mode .capture-ring {
 
 /* Sidebar Container Styles */
 .sidebar-container {
-    grid-column: 1;
-    grid-row: 1;
-    width: 100%;
-    max-width: clamp(240px, 22vw, 360px);
     display: contents;
 }
 
